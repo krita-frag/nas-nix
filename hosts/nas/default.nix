@@ -23,9 +23,13 @@
   boot.loader.efi.canTouchEfiVariables = true;
 
   # 二进制缓存换源：清华 TUNA 优先（cache.nixos.org 由系统自动附加）
-  nix.settings.substituters = [
-    "https://mirrors.tuna.tsinghua.edu.cn/nix-channels/store"
-  ];
+  nix.settings = {
+    substituters = [
+      "https://mirrors.tuna.tsinghua.edu.cn/nix-channels/store"
+    ];
+    # 启用 Flakes 与 nix-command（远程构建所需）
+    experimental-features = [ "nix-command" "flakes" ];
+  };
 
   # 系统版本（与 nixpkgs 通道一致，首次安装后不再变更）
   system.stateVersion = "26.05";
