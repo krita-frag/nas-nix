@@ -4,10 +4,9 @@
 {
   services.syncthing = {
     enable = true;
-    # 独立运行用户，避免以 root 同步文件
+    # 独立运行用户，避免以 root 同步文件；home=dataDir（模块自动建属主）
     user = "syncthing";
     dataDir = "/srv/syncthing";
-    configDir = "/var/lib/syncthing";
     # 声明式管理设备与文件夹（初始为空，由 GUI 添加后固化）
     overrideDevices = true;
     overrideFolders = true;
