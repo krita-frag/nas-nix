@@ -14,6 +14,8 @@
     # 应用容器层模块
     ../../modules/services/portainer.nix
     ../../modules/services/syncthing.nix
+    # agenix 密钥声明
+    ../../secrets/secrets.nix
   ];
 
   # 主机名

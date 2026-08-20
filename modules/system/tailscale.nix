@@ -2,7 +2,9 @@
 
 # Tailscale：安全组网与远程访问
 {
-  services.tailscale.enable = true;
-  # 认证密钥由 agenix 解密文件提供（接入 agenix 阶段启用）：
-  # services.tailscale.authKeyFile = config.age.secrets.tailscale-auth.path;
+  services.tailscale = {
+    enable = true;
+    # 首次加入组网时以 agenix 解密文件中的认证密钥自动登录
+    authKeyFile = config.age.secrets.tailscale-auth.path;
+  };
 }
