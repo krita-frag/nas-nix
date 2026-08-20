@@ -14,6 +14,11 @@
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
+  # 二进制缓存换源：清华 TUNA 优先（cache.nixos.org 由系统自动附加）
+  nix.settings.substituters = [
+    "https://mirrors.tuna.tsinghua.edu.cn/nix-channels/store"
+  ];
+
   # SSH：密钥认证，禁用密码登录
   services.openssh = {
     enable = true;

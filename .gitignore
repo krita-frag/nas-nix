@@ -1,0 +1,7 @@
+# 开发计划文档不入库
+DEVELOPMENT_PLAN.md
+
+# Nix 构建产物
+result
+result-*
+/nix
