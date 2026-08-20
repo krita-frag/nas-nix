@@ -11,6 +11,9 @@
     ../../modules/system/docker.nix
     ../../modules/system/zram.nix
     ../../modules/system/nix-gc.nix
+    # 应用容器层模块
+    ../../modules/services/portainer.nix
+    ../../modules/services/syncthing.nix
   ];
 
   # 主机名

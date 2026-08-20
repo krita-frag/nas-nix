@@ -11,8 +11,6 @@
         "security" = "user";
         "map to guest" = "Bad User";
       };
-    };
-    shares = {
       public = {
         path = "/srv/shares/public";
         "read only" = "no";
