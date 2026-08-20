@@ -11,14 +11,14 @@
         "security" = "user";
         "map to guest" = "Bad User";
       };
-      shares = {
-        public = {
-          path = "/srv/shares/public";
-          "read only" = "no";
-          "guest ok" = "yes";
-          "browseable" = "yes";
-          comment = "公共共享目录";
-        };
+    };
+    shares = {
+      public = {
+        path = "/srv/shares/public";
+        "read only" = "no";
+        "guest ok" = "yes";
+        "browseable" = "yes";
+        comment = "公共共享目录";
       };
     };
   };
