@@ -8,7 +8,16 @@
   };
 
   outputs = { self, nixpkgs, ... }:
+    let
+      # 部署工具：从 macOS（aarch64-darwin）驱动远程构建/切换
+      nixos-rebuild = system: nixpkgs.legacyPackages.${system}.nixos-rebuild;
+    in
     {
+      packages = {
+        aarch64-darwin.nixos-rebuild = nixos-rebuild "aarch64-darwin";
+        x86_64-linux.nixos-rebuild = nixos-rebuild "x86_64-linux";
+      };
+
       nixosConfigurations.nas = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         modules = [

@@ -3,6 +3,14 @@
 {
   imports = [
     ./hardware-configuration.nix
+    # 系统层模块
+    ../../modules/system/ssh.nix
+    ../../modules/system/tailscale.nix
+    ../../modules/system/samba.nix
+    ../../modules/system/cockpit.nix
+    ../../modules/system/docker.nix
+    ../../modules/system/zram.nix
+    ../../modules/system/nix-gc.nix
   ];
 
   # 主机名
@@ -17,20 +25,6 @@
   # 二进制缓存换源：清华 TUNA 优先（cache.nixos.org 由系统自动附加）
   nix.settings.substituters = [
     "https://mirrors.tuna.tsinghua.edu.cn/nix-channels/store"
-  ];
-
-  # SSH：密钥认证，禁用密码登录
-  services.openssh = {
-    enable = true;
-    settings = {
-      PasswordAuthentication = false;
-      KbdInteractiveAuthentication = false;
-    };
-  };
-
-  # 管理端公钥（macOS）
-  users.users.root.openssh.authorizedKeys.keys = [
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGMhourtyuIlX/oTPUpsLzKlv2xU7aEkWld4pj8ucm2D cc567821@163.com"
   ];
 
   # 系统版本（与 nixpkgs 通道一致，首次安装后不再变更）
