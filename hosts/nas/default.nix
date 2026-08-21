@@ -8,19 +8,18 @@
     ../../modules/system/tailscale.nix
     ../../modules/system/samba.nix
     ../../modules/system/cockpit.nix
-    ../../modules/system/docker.nix
+    ../../modules/system/podman.nix
+    ../../modules/system/tools.nix
     ../../modules/system/zram.nix
     ../../modules/system/nix-gc.nix
-    # 应用容器层模块
-    ../../modules/services/portainer.nix
     ../../modules/services/syncthing.nix
-    # agenix 密钥声明
-    ../../secrets/secrets.nix
+    # agenix 密钥声明（加密文件在 secrets/*.age，规则文件 secrets/secrets.nix 仅供 CLI 使用）
+    ../../modules/system/agenix.nix
   ];
 
   # 主机名
   networking.hostName = "nas";
-  # DHCP 网络（QEMU 虚拟网卡 enp0s1）
+  # DHCP 网络（由 NetworkManager 管理，虚拟网卡或实机网卡均可）
   networking.networkmanager.enable = true;
 
   # 引导器（UEFI）
@@ -38,4 +37,8 @@
 
   # 系统版本（与 nixpkgs 通道一致，首次安装后不再变更）
   system.stateVersion = "26.05";
+
+  # 声明式口令管理：用户口令完全由配置（含 agenix 密钥）决定，
+  # 运行时 passwd 改动在下次重建时还原，保证系统可复现与干净。
+  users.mutableUsers = false;
 }

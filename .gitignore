@@ -1,5 +1,5 @@
-# 开发计划文档不入库
-DEVELOPMENT_PLAN.md
+# 本地规划文档（开发计划等）不入库
+/plans/
 
 # Nix 构建产物
 result

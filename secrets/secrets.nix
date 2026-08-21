@@ -1,22 +1,17 @@
-{ config, lib, pkgs, ... }:
-
-# agenix：敏感数据声明式解密
-# 加密文件位于本目录（secrets/*.age），随仓库提交，明文不落盘
+# agenix CLI 加密规则
+# 本文件仅供 `agenix` CLI 使用（在此目录下运行），不导入 NixOS 配置。
+# 每个 .age 文件列出允许解密的主机/用户公钥；CLI 将公钥直接传给
+# `age --recipient`，使用 age 原生 SSH 接收者（ssh-ed25519 段），
+# 与部署机 `age -d -i /etc/ssh/ssh_host_ed25519_key` 完全兼容。
 {
-  age.secrets = {
-    # Tailscale 认证密钥（管理端用 `agenix -e` 编辑为真实密钥后重新部署）
-    "tailscale-auth" = {
-      file = ./tailscale-auth.age;
-      owner = "root";
-      group = "root";
-      mode = "0400";
-    };
-    # Samba 用户 nas 的口令
-    "samba-nas-password" = {
-      file = ./samba-nas-password.age;
-      owner = "root";
-      group = "root";
-      mode = "0400";
-    };
-  };
+  # NAS 主机 SSH 公钥：部署机用 /etc/ssh/ssh_host_ed25519_key 自解密
+  nas = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIClgBFWQEj/hNCkbO+PmTYkapBdrHoEBx5zr6XJ26lyX root@nas";
+  # 管理机（macOS）SSH 公钥：从本机编辑/解密密钥
+  admin = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGMhourtyuIlX/oTPUpsLzKlv2xU7aEkWld4pj8ucm2D cc567821@163.com";
+in
+{
+  "tailscale-auth.age".publicKeys = [ nas admin ];
+  "samba-nas-password.age".publicKeys = [ nas admin ];
+  # root 的登录口令哈希（Cockpit 等 PAM 认证用）
+  "root-password-hash.age".publicKeys = [ nas admin ];
 }
