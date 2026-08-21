@@ -4,7 +4,7 @@
 
 ## 特性
 
-- **声明式系统管理**：SSH、Tailscale、Samba、Cockpit、Podman、zram、自动 GC 全部以 NixOS 模块声明
+- **声明式系统管理**：SSH、Samba、Cockpit、Podman、自动 GC 全部以 NixOS 模块声明
 - **可复现**：`flake.lock` 锁定输入版本，任一环境可重建一致系统
 - **原子部署与回滚**：基于 NixOS generation，`switch` 原子切换，`--rollback` 一键回滚
 - **安全**：SSH 密钥认证、Tailscale 私有组网、敏感数据 agenix 加密入库
@@ -22,8 +22,8 @@
 │       ├── default.nix              # 主机级配置组装
 │       └── hardware-configuration.nix
 ├── modules/
-│   ├── system/               # 系统层模块（ssh/agenix/tailscale/samba/cockpit/podman/tools/zram/nix-gc）
-│   └── services/             # 应用服务模块（syncthing，按需扩展）
+│   ├── system/               # 系统层模块
+│   └── services/             # 应用服务模块
 └── secrets/
     ├── secrets.nix           # agenix CLI 加密规则（仅供 CLI，不导入配置）
     ├── tailscale-auth.age    # Tailscale 认证密钥（加密）
@@ -36,8 +36,37 @@
 ### 前置条件
 
 - NAS 已安装 NixOS，可从管理机密钥登录 `root@<nas-ip>`
-- 管理机（macOS）已安装 Nix；`age` 随系统或经 `brew install age` 提供
 - NAS 已生成 SSH 主机密钥（`/etc/ssh/ssh_host_ed25519_key`）
+
+### macOS 管理机安装与配置
+
+管理端只需要 Nix 与 age；构建、切换、密钥加解密全部经本仓库 flake 提供，不要求全局安装额外 CLI。
+
+1. **Nix（Determinate Nix）**
+   - 安装后二进制位于 `/nix/var/nix/profiles/default/bin/nix`，默认不在 PATH
+   - [deploy.sh](deploy.sh) 已自动处理该路径，直接运行脚本即可
+   - 如需在终端直接使用 `nix` 命令，在 `~/.zshrc` 追加：
+
+   ```bash
+   export PATH="/nix/var/nix/profiles/default/bin:$PATH"
+   ```
+
+2. **Homebrew 与 age**
+
+   ```bash
+   brew install age
+   ```
+
+   `age`（当前 v1.3.1）供 agenix 加密与本地解密校验使用。
+
+3. **SSH 密钥认证**
+   - 管理机已有 `~/.ssh/id_ed25519`，对应公钥已授权在 [modules/system/ssh.nix](modules/system/ssh.nix)（NAS root 登录）与 [secrets/secrets.nix](secrets/secrets.nix)（`admin` 接收者）
+   - 更换密钥对时需同步更新上述两处公钥，并对 `.age` 文件重加密（见下文）
+   - 首次连接将 NAS 主机指纹加入 `~/.ssh/known_hosts`
+
+4. **agenix CLI（仓库内置，无需全局安装）**
+   - nixpkgs 已不向 darwin 提供 agenix 包，本仓库在 [flake.nix](flake.nix) 暴露 `.#agenix`
+   - 在 `secrets/` 目录以 `nix run .#agenix -- <子命令>` 调用，见下文「敏感数据（agenix）」一节
 
 ### 远程部署（从 macOS）
 
@@ -79,9 +108,9 @@ nix flake lock --update-input nixpkgs
 
 ```bash
 cd secrets
-agenix -e tailscale-auth.age          # 编辑并重新加密（默认用 ~/.ssh 私钥）
-agenix -e samba-nas-password.age
-agenix -r                             # 修改 secrets.nix 公钥后重加密全部
+nix run .#agenix -- -e tailscale-auth.age     # 编辑并重新加密（默认用 ~/.ssh 私钥）
+nix run .#agenix -- -e samba-nas-password.age
+nix run .#agenix -- -r                        # 修改 secrets.nix 公钥后重加密全部
 ```
 
 编辑后提交 `.age` 文件并重新部署。**注意**：不要用 `builtins.readFile` 把明文读入配置（会落进 Nix store）。
@@ -90,11 +119,11 @@ agenix -r                             # 修改 secrets.nix 公钥后重加密全
 
 Tailscale 的节点注册要求持有凭据（auth key / OAuth client / 交互登录），安全模型上**至少需要一次手动创建**。本项目采用**可重用 + 永不过期**的 auth key，将手动操作压缩到一次性，此后全自动：
 
-- 在 [Tailscale 管理控制台](https://login.tailscale.com/admin/settings/keys) 生成 auth key（勾选 **Reusable + No expiration**），执行 `agenix -e tailscale-auth.age` 填入并保存
+- 在 [Tailscale 管理控制台](https://login.tailscale.com/admin/settings/keys) 生成 auth key（勾选 **Reusable + No expiration**），执行 `nix run .#agenix -- -e tailscale-auth.age` 填入并保存
 - 节点**首次上线**时由 `tailscaled-autoconnect` 服务消费 `/run/agenix/tailscale-auth` 自动登录；登录状态持久化于 `/var/lib/tailscale/tailscaled.state`，此后即使删除该 key 也不影响已上线节点
 - 新增机器或整机重建时，同一仓库配置自动完成组网，无需再次获取密钥
 
-> **换机迁移**：`.age` 文件加密时绑定机器 SSH 主机公钥。新机需将自身公钥加入 `secrets.nix` 后执行 `agenix -r` 重加密；root 口令等密码哈希本身是声明式常量，随配置迁移有效，无需重新生成。
+> **换机迁移**：`.age` 文件加密时绑定机器 SSH 主机公钥。新机需将自身公钥加入 `secrets.nix` 后执行 `nix run .#agenix -- -r` 重加密；root 口令等密码哈希本身是声明式常量，随配置迁移有效，无需重新生成。
 
 ## 内置服务
 
@@ -106,7 +135,7 @@ Tailscale 的节点注册要求持有凭据（auth key / OAuth client / 交互�
 | Syncthing | 8384（GUI）/ 22000（同步） | 多设备文件实时同步 |
 | Samba | 445/139 | 家庭文件共享（public 匿名 / nas 用户认证） |
 | Tailscale | — | 安全组网与远程访问 |
-| zramSwap | — | 内存压缩交换（约物理内存 50%） |
+| 内存调优 | — | zram 压缩交换（物理内存 50%）+ 内核内存策略（swappiness/vfs_cache_pressure）+ systemd-oomd 防冻结 |
 
 ## 冒烟清单
 
@@ -135,6 +164,8 @@ ss -tln | grep 8384                      # GUI 监听（默认仅本机）
 
 # zram / GC
 zramctl                                  # 应见 /dev/zram0 [SWAP]
+sysctl vm.swappiness vm.vfs_cache_pressure  # 应为 20 / 50
+systemctl is-active systemd-oomd         # oomd 已启用
 systemctl list-timers | grep nix-gc      # 自动 GC 定时器存在
 
 # 回滚可用性

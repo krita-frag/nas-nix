@@ -10,7 +10,7 @@
     ../../modules/system/cockpit.nix
     ../../modules/system/podman.nix
     ../../modules/system/tools.nix
-    ../../modules/system/zram.nix
+    ../../modules/system/memory.nix
     ../../modules/system/nix-gc.nix
     ../../modules/services/syncthing.nix
     # agenix 密钥声明（加密文件在 secrets/*.age，规则文件 secrets/secrets.nix 仅供 CLI 使用）
