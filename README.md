@@ -135,7 +135,24 @@ Tailscale 的节点注册要求持有凭据（auth key / OAuth client / 交互�
 | Syncthing | 8384（GUI）/ 22000（同步） | 多设备文件实时同步 |
 | Samba | 445/139 | 家庭文件共享（public 匿名 / nas 用户认证） |
 | Tailscale | — | 安全组网与远程访问 |
+| Gitea | 3000（Web）/ 22（git SSH） | 自托管 Git 服务，内置 GitHub Actions 兼容 CI（job 容器经 Podman 运行） |
 | 内存调优 | — | zram 压缩交换（物理内存 50%）+ 内核内存策略（swappiness/vfs_cache_pressure）+ systemd-oomd 防冻结 |
+
+### Gitea Actions 首次配置
+
+Gitea 部署后安装向导已锁定（`INSTALL_LOCK`），首次使用需一次性完成以下步骤：
+
+1. 浏览器打开 `http://<nas-ip>:3000`，创建首个管理员账号（仅一次）
+2. 管理员 → Actions → Runners → **Create new runner**，复制注册令牌
+3. 在 NAS 上写入令牌并重启 runner 服务（自动完成注册，此后持久）：
+
+   ```bash
+   ssh root@<nas-ip>
+   echo '<注册令牌>' > /var/lib/gitea-runner/registration-token
+   systemctl restart gitea-runner
+   ```
+
+4. 仓库内启用 Actions，`.gitea/workflows/*.yaml` 即按 GitHub Actions 语法执行；job 容器由 **Podman** 运行（经 Docker 兼容 socket），镜像走已配置的 Docker Hub 加速。
 
 ## 冒烟清单
 
@@ -161,6 +178,12 @@ podman ps                                 # 容器列表（经 Cockpit podman �
 
 # Syncthing
 ss -tln | grep 8384                      # GUI 监听（默认仅本机）
+
+# Gitea / Actions
+ss -tln | grep 3000                      # Gitea Web 监听
+systemctl is-active gitea gitea-runner   # Gitea 与 runner 服务
+curl -sf http://127.0.0.1:3000/api/v1/version  # Gitea 版本 API 应答
+ls /run/docker.sock                      # Podman Docker 兼容 socket（runner 依赖）
 
 # zram / GC
 zramctl                                  # 应见 /dev/zram0 [SWAP]
