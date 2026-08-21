@@ -28,4 +28,13 @@
     [[registry.mirror]]
     location = "docker.1ms.run"
   '';
+
+  # 本机 Gitea 内置 Container Registry（HTTP，非 TLS）：
+  # 供自托管服务镜像 push/pull（127.0.0.1:3000/<owner>/<image>）
+  environment.etc."containers/registries.conf.d/gitea-registry.conf".text = ''
+    [[registry]]
+    prefix = "127.0.0.1:3000"
+    location = "127.0.0.1:3000"
+    insecure = true
+  '';
 }

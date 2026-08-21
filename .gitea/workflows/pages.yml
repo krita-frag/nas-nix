@@ -1,0 +1,40 @@
+# Gitea Pages 发布：push main 时构建 MkDocs 知识库并强推 pages 分支
+# 仓库发布后由 Gitea Webhook POST → nginx → git-pages 自动部署（见 modules/services/pages.nix）
+# 注意：把下方 <owner> 替换为你的 Gitea 用户名；secret PAGES_TOKEN 为 write:repository 权限的 API token
+name: Deploy Pages
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出仓库
+        env:
+          GITEA_TOKEN: ${{ secrets.PAGES_TOKEN }}
+        run: |
+          apt-get update && apt-get install -y git >/dev/null
+          git clone --depth 1 --branch main "http://oauth2:${GITEA_TOKEN}@127.0.0.1:3000/zhou/nas-nix.git" /tmp/repo
+      - name: 构建 MkDocs
+        working-directory: /tmp/repo
+        run: |
+          apt-get install -y python3-pip >/dev/null
+          pip install -q mkdocs-material
+          mkdocs build --site-dir /tmp/site
+      - name: 发布到 pages 分支
+        env:
+          GITEA_TOKEN: ${{ secrets.PAGES_TOKEN }}
+        run: |
+          cd /tmp/repo
+          git config --global user.name "nas-pages"
+          git config --global user.email "pages@nas.local"
+          git remote set-url origin "http://oauth2:${GITEA_TOKEN}@127.0.0.1:3000/zhou/nas-nix.git"
+          git branch -D pages 2>/dev/null || true
+          git checkout --orphan pages
+          git rm -rf . 2>/dev/null || true
+          cp -r /tmp/site/. .
+          git add -A
+          git commit -m "pages: rebuild site"
+          git push -f origin pages

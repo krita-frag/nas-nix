@@ -135,7 +135,8 @@ Tailscale 的节点注册要求持有凭据（auth key / OAuth client / 交互�
 | Syncthing | 8384（GUI）/ 22000（同步） | 多设备文件实时同步 |
 | Samba | 445/139 | 家庭文件共享（public 匿名 / nas 用户认证） |
 | Tailscale | — | 安全组网与远程访问 |
-| Gitea | 3000（Web）/ 22（git SSH） | 自托管 Git 服务，内置 GitHub Actions 兼容 CI（job 容器经 Podman 运行） |
+| Gitea | 3000（Web）/ 22（git SSH） | 自托管 Git 服务，内置 GitHub Actions 兼容 CI（job 容器经 Podman 运行）与 OCI 镜像仓库 |
+| Gitea Pages | 8080 | 统一域名静态站托管（git-pages 引擎，`<nas-ip>:8080/<owner>/<repo>/`；push main 经 Actions 构建并自动发布） |
 | 内存调优 | — | zram 压缩交换（物理内存 50%）+ 内核内存策略（swappiness/vfs_cache_pressure）+ systemd-oomd 防冻结 |
 
 ### Gitea Actions 首次配置
@@ -153,6 +154,12 @@ Gitea 部署后安装向导已锁定（`INSTALL_LOCK`），首次使用需一次
    ```
 
 4. 仓库内启用 Actions，`.gitea/workflows/*.yaml` 即按 GitHub Actions 语法执行；job 容器由 **Podman** 运行（经 Docker 兼容 socket），镜像走已配置的 Docker Hub 加速。
+
+### 自托管服务一键部署（Gitea → NAS）
+
+在 Gitea 开发的服务可一键部署到 NAS 测试：push 触发 Actions 经 Podman 构建镜像 → 推入 Gitea 内置镜像仓库 → NAS 本机运行（开发期 `docker run` 临时容器，稳定后 Quadlet/systemd 托管并固化进 NixOS）。完整流程、Actions 模板与 Quadlet 示例见 [docs/container-deploy.md](docs/container-deploy.md)。
+
+服务/工具若需作为 **NixOS 系统一部分**（非容器，systemd 托管、随系统回滚、可复用模块），用服务 flake 模板接入：见 [docs/nixos-native-deploy.md](docs/nixos-native-deploy.md) 与 [docs/service-flake.example.nix](docs/service-flake.example.nix)。
 
 ## 冒烟清单
 
@@ -184,6 +191,14 @@ ss -tln | grep 3000                      # Gitea Web 监听
 systemctl is-active gitea gitea-runner   # Gitea 与 runner 服务
 curl -sf http://127.0.0.1:3000/api/v1/version  # Gitea 版本 API 应答
 ls /run/docker.sock                      # Podman Docker 兼容 socket（runner 依赖）
+ls /etc/containers/registries.conf.d/gitea-registry.conf  # 本机镜像仓库（insecure）配置
+
+# Gitea Pages
+ss -tln | grep 8080                         # nginx 对外端口监听
+ss -tln | grep 8081                         # git-pages 引擎监听（仅回环）
+systemctl is-active git-pages               # git-pages 服务
+curl -sf http://127.0.0.1:8080/             # Pages 根路径响应
+curl -sf http://127.0.0.1:8080/<owner>/nas-nix/ | head -1  # 知识库站点响应（替换 <owner>）
 
 # zram / GC
 zramctl                                  # 应见 /dev/zram0 [SWAP]

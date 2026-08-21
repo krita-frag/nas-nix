@@ -14,6 +14,7 @@
     ../../modules/system/nix-gc.nix
     ../../modules/services/syncthing.nix
     ../../modules/services/gitea.nix
+    ../../modules/services/pages.nix
     # agenix 密钥声明（加密文件在 secrets/*.age，规则文件 secrets/secrets.nix 仅供 CLI 使用）
     ../../modules/system/agenix.nix
   ];
@@ -42,4 +43,7 @@
   # 声明式口令管理：用户口令完全由配置（含 agenix 密钥）决定，
   # 运行时 passwd 改动在下次重建时还原，保证系统可复现与干净。
   users.mutableUsers = false;
+
+  # Gitea Pages：统一域名静态站托管（见 modules/services/pages.nix）
+  services.pages.enable = true;
 }

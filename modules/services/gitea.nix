@@ -19,6 +19,10 @@
       };
       # 启用 Actions（由 gitea-runner 消费）
       actions.ENABLED = true;
+      # 内置 OCI Container Registry：自托管服务的镜像仓库
+      # （Gitea 默认已启用，此处显式声明以文档化）
+      packages.ENABLED = true;
+      "packages.registry".ENABLED = true;
     };
   };
 
@@ -43,14 +47,23 @@
       fetch_timeout: 10s
       fetch_interval: 2s
       labels:
-        - ubuntu-latest:docker://node:16-bullseye
-        - ubuntu-22.04:docker://node:16-bullseye
-        - ubuntu-20.04:docker://node:16-bullseye
-
+        # 标准环境：node:20-bookworm（Debian Bookworm + node + bash/git/curl）
+        # 兼容 ubuntu 生态；各 ubuntu-* runs-on 统一指向该镜像，减少镜像拉取种类
+        - ubuntu-latest:docker://node:20-bookworm
+        - ubuntu-22.04:docker://node:20-bookworm
+        - ubuntu-20.04:docker://node:20-bookworm
+        # 轻量镜像：体积小、启动快，适合纯命令/工具类任务
+        # 注意：均不含 bash，workflow 需指定 shell: sh，或先安装依赖（apk/apt）
+        # 如使用 actions/checkout 等 bash 脚本 action，请改用 ubuntu-latest
+        - alpine:docker://docker.io/library/alpine:3.20
+        - node:docker://node:20-alpine
+        - debian:docker://debian:bookworm-slim
+        
     container:
       privileged: false
       network: ""
       force_pull: false
+      options: "-e HOME=/root"
       docker_host: unix:///run/docker.sock
 
     # Actions 缓存目录：置于 runner 状态目录内（系统用户 HOME=/var/empty 无写权限）

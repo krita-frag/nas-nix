@@ -1,0 +1,11 @@
+[Unit]
+Description=<服务描述>
+
+[Container]
+Image=127.0.0.1:3000/<owner>/<repo>:latest
+# 经 docker socket 登录过的凭据存于 root 的 ~/.docker/config.json，Quadlet 复用
+PublishPort=<宿主端口>:<容器端口>
+# Volume=<宿主数据目录>:<容器内路径>
+
+[Service]
+Restart=on-failure
