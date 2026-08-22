@@ -53,10 +53,11 @@
     enable = true;
   };
 
-  # 集中备份：restic 加密快照。repository 为空即骨架状态（不执行备份）；
-  # 填入实际目标（S3 原生或 rclone:<remote>:<path>）后自动启用每日备份（见 backup.nix）。
+  # 集中备份：restic 加密快照。当前为 VM 测试阶段，repository 指向本地测试仓库
+  # 以验证备份/恢复流程；实机部署时替换为真实目标（S3 原生或 rclone:<remote>:<path>），
+  # 见 modules/services/backup.nix。
   services.backup = {
     enable = true;
-    repository = "";
+    repository = "/var/lib/restic-test";
   };
 }
