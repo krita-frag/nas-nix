@@ -8,6 +8,7 @@
 
 ## 内容
 
+- [NixOS 运维问题排查指南（实战验证）](nixos-ops-guide.md)
 - [自托管服务一键部署（容器）](container-deploy.md)
 - [自托管服务本机声明式部署](nixos-native-deploy.md)
 
