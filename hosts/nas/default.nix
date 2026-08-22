@@ -16,6 +16,7 @@
     ../../modules/services/syncthing.nix
     ../../modules/services/gitea.nix
     ../../modules/services/docs.nix
+    ../../modules/services/backup.nix
     # agenix 密钥声明（加密文件在 secrets/*.age，规则文件 secrets/secrets.nix 仅供 CLI 使用）
     ../../modules/system/agenix.nix
   ];
@@ -50,5 +51,12 @@
   # 注册新知识库：在引擎仓库 repos.json 的 repos 列表加一行即可（无需改本文件）。
   services.docs = {
     enable = true;
+  };
+
+  # 集中备份：restic 加密快照。repository 为空即骨架状态（不执行备份）；
+  # 填入实际目标（S3 原生或 rclone:<remote>:<path>）后自动启用每日备份（见 backup.nix）。
+  services.backup = {
+    enable = true;
+    repository = "";
   };
 }

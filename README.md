@@ -156,6 +156,7 @@ Tailscale 的节点注册要求持有凭据（auth key / OAuth client / 交互�
 | Gitea | 3000（Web）/ 22（git SSH） | 自托管 Git 服务，内置 GitHub Actions 兼容 CI（job 容器经 Podman 运行）与 OCI 镜像仓库 |
 | 知识库 Docs | 8080 | 统一知识库中心（单一 MkDocs 站点）：`<nas-ip>:8080/` 统一主页 + 统一导航 + 全站搜索，各知识库位于 `/owner/name/`；引擎仓库（nas-docs）经 Actions 把各仓库 docs/ 合并为单一站点 → 直接写入站点根，Caddy 静态服务；另经 Tailscale Serve 提供尾网 HTTPS 入口 `https://<机器名>.ts.net/`（供强制 https 的爬虫，仅 tailnet 内可达） |
 | 内存调优 | — | zram 压缩交换（物理内存 50%）+ 内核内存策略（swappiness/vfs_cache_pressure）+ systemd-oomd 防冻结 |
+| 备份 | — | restic 加密快照 + rclone 网盘（3-2-1 异地加密副本，见下节） |
 
 ### Gitea Actions 首次配置
 
@@ -195,6 +196,27 @@ push nas-docs main / 每 6h 定时 / 手动 dispatch
 之后引擎每次重建自动把该仓库构建进统一站点，主页自动出现新卡片。
 
 **尾网 HTTPS 入口**（供强制 https 的爬虫抓取）：站点默认仅 HTTP 监听，另经 Tailscale Serve 挂到尾网 `https://<机器名>.ts.net/`（仅 tailnet 内可达、无公网暴露）。一次性手动步骤：在 [Tailscale 管理台](https://login.tailscale.com/admin) 启用 **Serve**，此后本机服务自动生效，无需重启。
+
+### 备份与恢复（restic + rclone）
+
+集中备份遵循 **3-2-1**：NAS 为本地主副本，restic 加密快照 + rclone 上传网盘作异地加密副本。数据范围见 [modules/services/backup.nix](modules/services/backup.nix)（默认 `/srv/shares` + `/srv/syncthing` + `/var/lib/gitea` 全量关键数据）。
+
+- **启用**：在 [hosts/nas/default.nix](hosts/nas/default.nix) 的 `services.backup.repository` 填入实际仓库（S3 原生 `s3:s3.<region>.amazonaws.com/<bucket>` 或 rclone 桥接 `rclone:<remote>:<path>`），部署后自动启用每日 03:00 备份（`Persistent` 补跑错过的任务）。留空为骨架状态，不执行备份
+- **口令**：restic 仓库口令经 agenix 加密（`restic-repo-password.age`，nas + 管理机双接收者），明文不入库；需要时在 `secrets/` 执行 `nix run .#agenix -- -d restic-repo-password.age` 解密
+- **保留策略**：每日 7 份 + 每周 4 份 + 每月 12 份，prune 自动清理
+
+常用操作（NAS 上）：
+
+```bash
+# 备份状态
+systemctl status restic-backups-nas-data
+# 查看快照
+restic -r <repository> snapshots
+# 挂载浏览历史版本
+restic -r <repository> mount /mnt/restore
+# 恢复单个文件
+restic -r <repository> restore latest --target /tmp/restore --include "path/to/file"
+```
 
 ### 自托管服务一键部署（Gitea → NAS）
 

@@ -14,4 +14,6 @@ in
   "samba-nas-password.age".publicKeys = [ nas admin ];
   # root 的登录口令哈希（Cockpit 等 PAM 认证用）
   "root-password-hash.age".publicKeys = [ nas admin ];
+  # restic 备份仓库口令（见 modules/services/backup.nix）
+  "restic-repo-password.age".publicKeys = [ nas admin ];
 }

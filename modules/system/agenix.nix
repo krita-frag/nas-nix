@@ -26,6 +26,13 @@
       group = "root";
       mode = "0400";
     };
+    # restic 备份仓库口令（见 modules/services/backup.nix）
+    "restic-repo-password" = {
+      file = ../../secrets/restic-repo-password.age;
+      owner = "root";
+      group = "root";
+      mode = "0400";
+    };
   };
 
   # root 口令来自 agenix 解密文件，明文不入库、不落盘
