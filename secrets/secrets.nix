@@ -16,4 +16,6 @@ in
   "root-password-hash.age".publicKeys = [ nas admin ];
   # restic 备份仓库口令（见 modules/services/backup.nix）
   "restic-repo-password.age".publicKeys = [ nas admin ];
+  # rclone 远端凭据（rclone:<remote>: 桥接备份仓库时使用；实机接入后生成文件）
+  "rclone-conf.age".publicKeys = [ nas admin ];
 }

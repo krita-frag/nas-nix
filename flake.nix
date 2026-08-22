@@ -16,6 +16,12 @@
       # agenix CLI：管理端加密/编辑密钥；ssh-to-age：SSH 公钥转 age 接收者
       agenix-cli = system: agenix.packages.${system}.default;
       ssh-to-age = system: nixpkgs.legacyPackages.${system}.ssh-to-age;
+      # kb-builder 预烘焙镜像构建：把 runner/build-kb-image.sh 打包成可执行命令，
+      # 重装系统后 `nix run .#kb-builder` 一条命令恢复 Gitea Actions 构建环境
+      kb-builder = system: nixpkgs.legacyPackages.${system}.writeShellScriptBin "kb-builder" ''
+        export KB_BUILDER_DOCKERFILE=${./runner/kb-builder.Dockerfile}
+        exec bash ${./runner/build-kb-image.sh}
+      '';
     in
     {
       packages = {
@@ -23,6 +29,8 @@
         x86_64-linux.nixos-rebuild = nixos-rebuild "x86_64-linux";
         aarch64-darwin.agenix = agenix-cli "aarch64-darwin";
         aarch64-darwin.ssh-to-age = ssh-to-age "aarch64-darwin";
+        aarch64-darwin.kb-builder = kb-builder "aarch64-darwin";
+        x86_64-linux.kb-builder = kb-builder "x86_64-linux";
       };
 
       nixosConfigurations.nas = nixpkgs.lib.nixosSystem {

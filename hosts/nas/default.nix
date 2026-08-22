@@ -17,6 +17,8 @@
     ../../modules/services/gitea.nix
     ../../modules/services/docs.nix
     ../../modules/services/backup.nix
+    # 尾网 HTTPS 入口（Gitea/Docs 经 tailscale serve 暴露，见各服务模块规则）
+    ../../modules/services/tailscale-serve.nix
     # agenix 密钥声明（加密文件在 secrets/*.age，规则文件 secrets/secrets.nix 仅供 CLI 使用）
     ../../modules/system/agenix.nix
   ];
@@ -52,6 +54,10 @@
   services.docs = {
     enable = true;
   };
+
+  # 尾网 HTTPS 入口：Gitea(:8443) 与 Docs(:443) 经 tailscale serve 挂到尾网
+  # （https://<机器名>.ts.net/），有效证书、仅 tailnet 内可达（见 modules/services/tailscale-serve.nix）
+  services.tailscaleServe.enable = true;
 
   # 集中备份：restic 加密快照。当前为 VM 测试阶段，repository 指向本地测试仓库
   # 以验证备份/恢复流程；实机部署时替换为真实目标（S3 原生或 rclone:<remote>:<path>），

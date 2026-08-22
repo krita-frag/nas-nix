@@ -16,19 +16,22 @@
 ```
 ├── flake.nix                 # Flake 入口：输入定义与主机装配
 ├── flake.lock                # 输入锁定（随仓库提交）
-├── deploy.sh                 # 一键部署脚本（switch/预演/回滚/冒烟）
+├── deploy.sh                 # 一键部署脚本（switch/预演/回滚/冒烟/check）
 ├── hosts/
 │   └── nas/
 │       ├── default.nix              # 主机级配置组装
 │       └── hardware-configuration.nix
 ├── modules/
 │   ├── system/               # 系统层模块
-│   └── services/             # 应用服务模块
+│   └── services/             # 应用服务模块（含 tailscale-serve.nix 通用 HTTPS 入口）
+├── runner/                   # Gitea Actions kb-builder 预烘焙镜像（Dockerfile + 构建脚本）
 └── secrets/
     ├── secrets.nix           # agenix CLI 加密规则（仅供 CLI，不导入配置）
     ├── tailscale-auth.age    # Tailscale 认证密钥（加密）
     ├── samba-nas-password.age# Samba 口令（加密）
-    └── root-password-hash.age# root 登录口令哈希（加密）
+    ├── root-password-hash.age# root 登录口令哈希（加密）
+    ├── restic-repo-password.age# 备份仓库口令（加密）
+    └── rclone-conf.age       # rclone 网盘凭据（加密，实机接入后生成）
 ```
 
 ## 快速开始
@@ -78,6 +81,7 @@
 ./deploy.sh smoke           # 部署后冒烟验证
 ./deploy.sh dry-run         # 预演（构建但不切换）
 ./deploy.sh rollback        # 回滚到上一代
+./deploy.sh check           # 本地配置校验（nix eval，无需 SSH，部署前快检）
 TARGET=192.168.64.4 ./deploy.sh   # 指定目标主机
 ```
 
@@ -153,7 +157,7 @@ Tailscale 的节点注册要求持有凭据（auth key / OAuth client / 交互�
 | Syncthing | 8384（GUI，仅本机）/ 22000（同步） | 多设备文件实时同步 |
 | Samba | 445/139 | 家庭文件共享（public 匿名 / nas 用户认证） |
 | Tailscale | — | 安全组网与远程访问 |
-| Gitea | 3000（Web）/ 22（git SSH） | 自托管 Git 服务，内置 GitHub Actions 兼容 CI（job 容器经 Podman 运行）与 OCI 镜像仓库 |
+| Gitea | 3000（Web）/ 22（git SSH） | 自托管 Git 服务，内置 GitHub Actions 兼容 CI（job 容器经 Podman 运行）与 OCI 镜像仓库；经 Tailscale Serve 提供尾网 HTTPS 入口 `https://<机器名>.ts.net:8443/`（仅 tailnet 内可达） |
 | 知识库 Docs | 8080 | 统一知识库中心（单一 MkDocs 站点）：`<nas-ip>:8080/` 统一主页 + 统一导航 + 全站搜索，各知识库位于 `/owner/name/`；引擎仓库（nas-docs）经 Actions 把各仓库 docs/ 合并为单一站点 → 直接写入站点根，Caddy 静态服务；另经 Tailscale Serve 提供尾网 HTTPS 入口 `https://<机器名>.ts.net/`（供强制 https 的爬虫，仅 tailnet 内可达） |
 | 内存调优 | — | zram 压缩交换（物理内存 50%）+ 内核内存策略（swappiness/vfs_cache_pressure）+ systemd-oomd 防冻结 |
 | 备份 | — | restic 加密快照 + rclone 网盘（3-2-1 异地加密副本，见下节） |
@@ -184,10 +188,11 @@ Gitea 部署后安装向导已锁定（`INSTALL_LOCK`），首次使用需一次
 | `kb-builder` | Podman 容器（本地预烘焙镜像，git/mkdocs 已预装） | 需容器隔离的仓库 | 知识库整体构建 ~40s |
 | `ubuntu-latest` 等 | Podman 容器（node:20-bookworm） | 通用/第三方 action | 含每次依赖安装 |
 
-- `nas-host` 的 job 直接以 `gitea-runner` 权限在宿主执行，信任边界扩大，仅限受信任仓库使用；需隔离时改用 `kb-builder`。
+- 知识库引擎默认用 `kb-builder`（容器隔离，收敛信任边界）；`nas-host` 的 job 直接以 `gitea-runner` 权限在宿主执行，信任边界扩大，仅限高度受信任的本地仓库使用。
 - host job 复用宿主工具：runner PATH 指向 `config.system.path`（systemPackages 聚合），[tools.nix](modules/system/tools.nix) 预装的 git/python3/node/go/rust/gcc/make/cmake/ccache 等工具链对 job 直接可见，免每次下载安装；新增工具只需在该文件添加。
-- 预烘焙镜像在 NAS 本地构建（`bash runner/build-kb-image.sh`，与 runner 共用镜像存储免 registry push）；镜像随系统重装丢失，重建执行该脚本即可。
+- 预烘焙镜像在 NAS 本地构建（`nix run .#kb-builder`，等价 `bash runner/build-kb-image.sh`，与 runner 共用镜像存储免 registry push）；镜像随系统重装丢失，重建一条命令即可。
 - 知识库构建的 Python 依赖（mkdocs-material 等）复用持久缓存 venv（`/var/lib/gitea-runner/kb-cache` 或容器 `/kb-cache`），跨运行不重复 pip install。
+- 信任收敛：Gitea 已关闭匿名自助注册（`service.DISABLE_REGISTRATION`），账号由管理员后台创建；`PAGES_TOKEN` 建议用独立非管理员账号（如 `kb-robot`）的 write:repository token，泄露时不波及管理账号。
 
 ### 知识库中心（Docs）
 
@@ -210,7 +215,7 @@ push nas-docs main / 每 6h 定时 / 手动 dispatch
 
 之后引擎每次重建自动把该仓库构建进统一站点，主页自动出现新卡片。
 
-**尾网 HTTPS 入口**（供强制 https 的爬虫抓取）：站点默认仅 HTTP 监听，另经 Tailscale Serve 挂到尾网 `https://<机器名>.ts.net/`（仅 tailnet 内可达、无公网暴露）。一次性手动步骤：在 [Tailscale 管理台](https://login.tailscale.com/admin) 启用 **Serve**，此后本机服务自动生效，无需重启。
+**尾网 HTTPS 入口**（供强制 https 的爬虫抓取）：站点默认仅 HTTP 监听，另经 Tailscale Serve 挂到尾网 `https://<机器名>.ts.net/`（仅 tailnet 内可达、无公网暴露）。通用模块 [tailscale-serve.nix](modules/services/tailscale-serve.nix) 统一管理：Docs 在 `https://<机器名>.ts.net/`（443），Gitea 在 `https://<机器名>.ts.net:8443/`。一次性手动步骤：在 [Tailscale 管理台](https://login.tailscale.com/admin) 启用 **Serve**，此后本机服务自动生效，无需重启。
 
 ### 备份与恢复（restic + rclone）
 
@@ -218,6 +223,7 @@ push nas-docs main / 每 6h 定时 / 手动 dispatch
 
 - **启用**：在 [hosts/nas/default.nix](hosts/nas/default.nix) 的 `services.backup.repository` 填入实际仓库（S3 原生 `s3:s3.<region>.amazonaws.com/<bucket>` 或 rclone 桥接 `rclone:<remote>:<path>`），部署后自动启用每日 03:00 备份（`Persistent` 补跑错过的任务）。留空为骨架状态，不执行备份
 - **口令**：restic 仓库口令经 agenix 加密（`restic-repo-password.age`，nas + 管理机双接收者），明文不入库；需要时在 `secrets/` 执行 `nix run .#agenix -- -d restic-repo-password.age` 解密
+- **rclone 凭据**：rclone 桥接后端需远端凭据，在 `secrets/` 执行 `nix run .#agenix -- -e rclone-conf.age` 填入 rclone 配置，再把路径填入 `services.backup.rcloneConf`（如 `/run/agenix/rclone-conf`），模块以 `RCLONE_CONFIG` 注入备份服务
 - **保留策略**：每日 7 份 + 每周 4 份 + 每月 12 份，prune 自动清理
 
 常用操作（NAS 上）：
@@ -233,6 +239,13 @@ restic -r <repository> mount /mnt/restore
 restic -r <repository> restore latest --target /tmp/restore --include "path/to/file"
 ```
 
+**整机恢复演练**（灾难恢复 runbook，建议定期演练）：
+
+1. 新机安装 NixOS 并完成仓库引导（见「新机引导清单」），部署配置到可运行状态
+2. 恢复数据：`restic -r <repository> restore latest --target / --path /srv/shares --path /srv/syncthing --path /var/lib/gitea`，或 `restic -r <repository> mount /mnt/restore` 挂载后按需复制
+3. 校验：Samba/Syncthing/Gitea 服务正常、关键数据与备份源 diff 一致、`restic check` 通过
+4. 密钥适配：新机公钥加入 [secrets.nix](secrets/secrets.nix) 后 `nix run .#agenix -- -r` 重加密全部 `.age`
+
 ### 自托管服务一键部署（Gitea → NAS）
 
 在 Gitea 开发的服务可一键部署到 NAS 测试：push 触发 Actions 经 Podman 构建镜像 → 推入 Gitea 内置镜像仓库 → NAS 本机运行（开发期 `docker run` 临时容器，稳定后 Quadlet/systemd 托管并固化进 NixOS）。完整流程、Actions 模板与 Quadlet 示例见 [docs/container-deploy.md](docs/container-deploy.md)。
@@ -245,7 +258,7 @@ restic -r <repository> restore latest --target /tmp/restore --include "path/to/f
 
 ```bash
 # agenix 密钥已挂载
-ls /run/agenix/                          # 应见 tailscale-auth、samba-nas-password
+ls /run/agenix/                          # 应见 tailscale-auth、samba-nas-password、root-password-hash、restic-repo-password
 
 # SSH
 ssh root@<nas-ip>                        # 应免密登录，密码登录被拒
@@ -295,6 +308,7 @@ nix-env --list-generations --profile /nix/var/nix/profiles/system  # 存在多�
 - SSH 仅密钥认证（禁用密码/键盘交互登录），限尝试次数（`MaxAuthTries=3`），管理机公钥在 [modules/system/ssh.nix](modules/system/ssh.nix) 声明
 - 全部敏感数据经 agenix 加密，仅绑定主机 SSH 密钥可解密；密钥文件可安全提交到 Git
 - 防火墙默认开启，仅放行必需端口；远程访问经 Tailscale 私有组网（tailnet），无公网端口转发
+- **无全局代理**：NAS 不依赖系统级 HTTP 代理（nixpkgs 走 TUNA 镜像、知识库构建走本机 Gitea，公网 Git 拉取在管理机进行），避免重启丢失的隐式代理依赖与本机 127.0.0.1 访问被代理 502 的隐患；如曾有手动 `systemctl set-environment http_proxy=...`，执行 `systemctl --no-pager unset-environment http_proxy https_proxy all_proxy` 清除
 
 本机放行端口及暴露范围：
 

@@ -23,6 +23,9 @@
       # （Gitea 默认已启用，此处显式声明以文档化）
       packages.ENABLED = true;
       "packages.registry".ENABLED = true;
+      # 关闭匿名自助注册：防外部主体进入信任圈（注册入知识库即获得站点写入能力），
+      # 账号一律由管理员后台创建
+      service.DISABLE_REGISTRATION = true;
     };
   };
 
@@ -142,4 +145,13 @@
 
   # 放行 Gitea Web 端口
   networking.firewall.allowedTCPPorts = [ 3000 ];
+
+  # 尾网 HTTPS 入口：Gitea Web 经 tailscale serve 挂到尾网（https://<机器名>.ts.net:8443/），
+  # 有效证书、仅 tailnet 内可达；与 docs 共用 443 之外独立端口，无需改动 Gitea ROOT_URL。
+  # 机制见通用模块 tailscale-serve.nix
+  services.tailscaleServe.rules = [{
+    name = "gitea";
+    https = 8443;
+    target = "http://127.0.0.1:3000";
+  }];
 }

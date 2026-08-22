@@ -8,6 +8,7 @@
 #   ./deploy.sh dry-run         # 构建但不切换（预演）
 #   ./deploy.sh rollback        # 回滚到上一代
 #   ./deploy.sh smoke           # 运行冒烟测试
+#   ./deploy.sh check           # 本地配置校验（nix eval，无需 SSH）
 #   TARGET=<ip> ./deploy.sh     # 指定目标主机（实机接入时用真实 IP 覆盖）
 #
 # 知识库发布不在此脚本：引擎仓库 nas-docs 自带 publish.sh（Gitea API 触发构建）。
@@ -91,8 +92,18 @@ echo "--- 系统 generation 数 ---"
 nix-env --list-generations --profile /nix/var/nix/profiles/system | wc -l
 SMOKE
     ;;
+  check)
+    # 本地配置快检：不连 NAS，先确保 Nix 表达式可求值（捕获语法/模块错误），
+    # 比等远程构建在 SSH 前暴露问题
+    echo "==> 本地配置校验（nix eval）"
+    if ! nix eval --raw ".#nixosConfigurations.nas.config.networking.hostName" >/dev/null 2>&1; then
+      echo "错误：Nix 配置求值失败，请先修正再部署。" >&2
+      exit 1
+    fi
+    echo "OK：配置可求值，主机名=$(nix eval --raw ".#nixosConfigurations.nas.config.networking.hostName")"
+    ;;
   *)
-    echo "用法: $0 [switch|dry-run|rollback|smoke]" >&2
+    echo "用法: $0 [switch|dry-run|rollback|smoke|check]" >&2
     exit 1
     ;;
 esac

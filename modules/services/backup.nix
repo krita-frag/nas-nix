@@ -18,6 +18,12 @@
       description = "restic 仓库地址。填入实际目标后启用：S3 原生（s3:s3.<region>.amazonaws.com/<bucket>）或 rclone 桥接（rclone:<remote>:<path>）；留空禁用";
     };
 
+    rcloneConf = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = "rclone 配置文件路径（经 agenix 解密挂载，如 /run/agenix/rclone-conf）。repository 用 rclone:<remote>:<path> 桥接网盘时需要远端凭据，设置后以 RCLONE_CONFIG 环境变量供 restic 调用 rclone 使用";
+    };
+
     paths = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [ "/srv/shares" "/srv/syncthing" "/var/lib/gitea" ];
@@ -32,6 +38,16 @@
     # 仓库口令：restic 初始化/读写仓库均需；经 agenix 加密，仅在需要时解密
     age.secrets.restic-repo-password = {
       file = ../../secrets/restic-repo-password.age;
+      owner = "root";
+      group = "root";
+      mode = "0400";
+    };
+
+    # rclone 远端凭据：仅 rclone:<remote>: 后端需要，经 agenix 加密挂载。
+    # 条件定义：未设置 rcloneConf 时不声明密钥，避免缺失 .age 文件导致部署失败；
+    # 实机接入时用 `nix run .#agenix -- -e rclone-conf.age` 生成后再填路径
+    age.secrets."rclone-conf" = lib.mkIf (config.services.backup.rcloneConf != null) {
+      file = ../../secrets/rclone-conf.age;
       owner = "root";
       group = "root";
       mode = "0400";
@@ -52,6 +68,13 @@
         "--keep-weekly 4"
         "--keep-monthly 12"
       ];
+    };
+
+    # rclone 桥接仓库：把配置路径注入备份服务环境（RCLONE_CONFIG），restic 调用
+    # rclone 时凭据可用。nixpkgs restic 模块无 environment 选项，故直接扩展
+    # 其生成的单元（restic-backups-nas-data）添加 Environment
+    systemd.services."restic-backups-nas-data" = lib.mkIf (config.services.backup.repository != "" && config.services.backup.rcloneConf != null) {
+      serviceConfig.Environment = "RCLONE_CONFIG=${config.services.backup.rcloneConf}";
     };
   };
 }
