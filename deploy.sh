@@ -34,6 +34,10 @@ if ! command -v nix >/dev/null 2>&1; then
   fi
 fi
 
+MODE="${1:-switch}"
+
+# check 模式为纯本地快检（nix eval），无需 SSH 与提交状态检查
+if [ "$MODE" != "check" ]; then
 # --- 预检：SSH 密钥认证连通性（安全：仅密钥、无交互）---
 echo "==> 检查 SSH 连通性（${REMOTE}）"
 if ! ssh ${SSH_OPTS} "${REMOTE}" 'true' 2>/dev/null; then
@@ -46,8 +50,8 @@ fi
 if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
   echo "==> 提示：存在未提交改动，部署结果可能与已提交配置不一致（建议先 commit）"
 fi
+fi
 
-MODE="${1:-switch}"
 case "${MODE}" in
   switch)
     echo "==> 远程构建并切换 ${FLAKE}（构建/切换均在 NAS 进行）"
