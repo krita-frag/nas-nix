@@ -89,9 +89,12 @@
       };
     };
 
-    # 站点根目录：runner 容器（root）写入，Caddy 用户只读
+    # 站点根目录：runner 写入（host 直跑以 gitea-runner 用户、容器以 root），Caddy 只读。
+    # d 创建/修正顶层属主；Z 递归 chown 整棵树（不含 mode，避免把 html/css 变为可执行），
+    # 保证升级前由 root 容器写入的旧内容子目录也可被 gitea-runner 递归删除/覆盖
     systemd.tmpfiles.rules = [
-      "d ${config.services.docs.root} 0755 root root - -"
+      "d ${config.services.docs.root} 0755 gitea-runner gitea-runner - -"
+      "Z ${config.services.docs.root} - gitea-runner gitea-runner - -"
     ];
 
     networking.firewall.allowedTCPPorts = [ config.services.docs.port ];

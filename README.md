@@ -172,7 +172,21 @@ Gitea 部署后安装向导已锁定（`INSTALL_LOCK`），首次使用需一次
    systemctl restart gitea-runner
    ```
 
-4. 仓库内启用 Actions，`.gitea/workflows/*.yaml` 即按 GitHub Actions 语法执行；job 容器由 **Podman** 运行（经 Docker 兼容 socket），镜像走已配置的 Docker Hub 加速。
+4. 仓库内启用 Actions，`.gitea/workflows/*.yaml` 即按 GitHub Actions 语法执行。
+
+#### Runner 标签（`runs-on`）与性能取向
+
+构建性能取决于 job 环境：runner 经 systemd 注入 `git/python3/bash`，本机直跑（`nas-host`）无容器/镜像/安装开销，最快；预烘焙镜像（`kb-builder`）把依赖一次装进本地镜像，容器隔离且免每次安装。二者均直连本机 Gitea（`127.0.0.1:3000`，host 网络），并声明 `no_proxy` 绕过管理机代理，避免访问本机 127.0.0.1 被代理 502。
+
+| 标签 | 运行方式 | 适用 | 参考耗时 |
+| --- | --- | --- | --- |
+| `nas-host` | NixOS 宿主以 `gitea-runner` 用户直跑（无容器） | 受信任仓库，最快 | 知识库整体构建 ~20s |
+| `kb-builder` | Podman 容器（本地预烘焙镜像，git/mkdocs 已预装） | 需容器隔离的仓库 | 知识库整体构建 ~40s |
+| `ubuntu-latest` 等 | Podman 容器（node:20-bookworm） | 通用/第三方 action | 含每次依赖安装 |
+
+- `nas-host` 的 job 直接以 `gitea-runner` 权限在宿主执行，信任边界扩大，仅限受信任仓库使用；需隔离时改用 `kb-builder`。
+- 预烘焙镜像在 NAS 本地构建（`bash runner/build-kb-image.sh`，与 runner 共用镜像存储免 registry push）；镜像随系统重装丢失，重建执行该脚本即可。
+- 知识库构建的 Python 依赖（mkdocs-material 等）复用持久缓存 venv（`/var/lib/gitea-runner/kb-cache` 或容器 `/kb-cache`），跨运行不重复 pip install。
 
 ### 知识库中心（Docs）
 
@@ -297,9 +311,9 @@ nix-env --list-generations --profile /nix/var/nix/profiles/system  # 存在多�
 
 ### 信任边界
 
-- **runner 容器为高信任主体**：`gitea-runner` 的 job 容器使用 host 网络（容器内 `127.0.0.1` 即宿主 Gitea），且持有 `PAGES_TOKEN`（write:repository 权限 API token）、可写挂载 `/var/www/docs` 与 `/kb-cache`（见 [gitea.nix](modules/services/gitea.nix)）。因此能触发引擎构建的主体即等同于可写入站点内容与宿主 Gitea 部分仓库。
+- **runner 为高信任主体**：`gitea-runner` 使用 host 网络（job 内 `127.0.0.1` 即宿主 Gitea），持有 `PAGES_TOKEN`（write:repository 权限 API token）、可写 `/var/www/docs` 与 `/kb-cache`（见 [gitea.nix](modules/services/gitea.nix)）。其中 `nas-host` 标签的 job 直接以 `gitea-runner` 权限在宿主执行（无容器隔离），`kb-builder`/`ubuntu-latest` 等容器标签经 Podman 隔离。因此能触发引擎构建的主体即等同于可写入站点内容与宿主 Gitea 部分仓库。
 - 触发路径：push nas-docs main、6h 定时、手动 dispatch，以及被 `repos.json` 注册的内容仓库（其 Markdown 会被聚合进统一站点）。给仓库开放 Gitea 写权限或注册进知识库即视为加入该信任圈。
-- **外部访问者只读**：Caddy 静态服务无任何写能力；`gitea` 服务沙箱（`ProtectSystem=strict`）下 `/var/www/docs` 只读，部署由 runner 容器完成。
+- **外部访问者只读**：Caddy 静态服务无任何写能力；`gitea` 服务沙箱（`ProtectSystem=strict`）下 `/var/www/docs` 只读，部署由 runner（host 直跑或 job 容器）完成。
 - 知识库与 Gitea 走内网明文 HTTP，信任边界为 LAN/tailnet 本身，不应对公网暴露；如需公网访问请先置于 tailnet 或反向代理加 TLS。
 
 ### 密钥轮换

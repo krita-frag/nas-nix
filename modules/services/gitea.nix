@@ -58,6 +58,13 @@
         - alpine:docker://docker.io/library/alpine:3.20
         - node:docker://node:20-alpine
         - debian:docker://debian:bookworm-slim
+        # 预烘焙镜像：一次构建把 git/python3 与 mkdocs（/opt/venv）装进镜像，
+        # 免去每次运行 apt-get/pip 的重复耗时；本地构建（runner/build-kb-image.sh），
+        # 配合 force_pull:false 命中本地镜像不联网拉取
+        - kb-builder:docker://127.0.0.1:3000/kb-builder:latest
+        # 本机直跑：job 在宿主以 gitea-runner 用户直接执行（无容器/镜像/apt-get，最快）。
+        # 信任边界扩大——仓库代码可在宿主以 gitea-runner 权限运行，仅限受信任仓库使用
+        - nas-host:host
         
     container:
       privileged: false
@@ -89,11 +96,24 @@
     wantedBy = [ "multi-user.target" ];
     after = [ "gitea.service" "podman.socket" ];
     wants = [ "gitea.service" ];
+    # nas-host（本机直跑）依赖：把 git/python3/bash 注入 runner 进程 PATH，
+    # host job 继承后可直接执行（无需每次 apt-get）
+    path = with pkgs; [ git python3 bash ];
     serviceConfig = {
       User = "gitea-runner";
       Group = "gitea-runner";
       WorkingDirectory = "/var/lib/gitea-runner";
       StateDirectory = "gitea-runner";
+      # HOME 指向可写状态目录：系统用户默认 /var/empty 只读，host job 的 git 全局配置、
+      # 缓存等需要可写
+      # no_proxy：宿主系统级默认走代理（http_proxy 指向管理机），而 job 需直连本机
+      # Gitea（127.0.0.1:3000）。无 no_proxy 时 git clone 经代理访问本机 127.0.0.1
+      # 返回 502（代理无法访问 NAS 自身）。声明 no_proxy 让本机访问绕过代理
+      Environment = [
+        "HOME=/var/lib/gitea-runner"
+        "no_proxy=127.0.0.1,localhost"
+        "NO_PROXY=127.0.0.1,localhost"
+      ];
       Restart = "on-failure";
       RestartSec = 10;
     };
