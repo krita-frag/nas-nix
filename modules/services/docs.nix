@@ -1,4 +1,4 @@
-{ config, lib, ... }:
+{ config, lib, pkgs, ... }:
 
 # 统一知识库中心：单一 MkDocs 站点，无子站割裂。引擎为独立仓库 nas-docs。
 #
@@ -53,6 +53,25 @@
 
     # nginx 不承担本机静态服务（Caddy 提供），整体停用减少运行面
     services.nginx.enable = lib.mkDefault false;
+
+    # 尾网 HTTPS 入口：Caddy 仅 HTTP 监听 :8080，强制 https 的抓取工具（WebFetch 类
+    # LLM 爬虫）无法直连内网 http。经 tailscale serve 把站点挂到尾网 HTTPS
+    # （https://<机器名>.ts.net/）：有效证书、无公网暴露、仅 tailnet 内节点可达，
+    # 站点 URL 不变，只是多一条 HTTPS 入口。serve 配置持久于 tailscaled 状态，
+    # 重启自动恢复；on-failure 重试覆盖首次加入组网（authKeyFile 自动登录）前的空窗。
+    systemd.services.tailscale-serve-docs = {
+      description = "Expose docs site over tailnet HTTPS (tailscale serve)";
+      after = [ "tailscaled.service" ];
+      wants = [ "tailscaled.service" ];
+      wantedBy = [ "multi-user.target" ];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        Restart = "on-failure";
+        RestartSec = "10s";
+        ExecStart = "${pkgs.tailscale}/bin/tailscale serve --bg --https=443 http://127.0.0.1:${toString config.services.docs.port}";
+      };
+    };
 
     # 站点根目录：runner 容器（root）写入，Caddy 用户只读
     systemd.tmpfiles.rules = [

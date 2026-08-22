@@ -140,7 +140,7 @@ Tailscale 的节点注册要求持有凭据（auth key / OAuth client / 交互�
 | Samba | 445/139 | 家庭文件共享（public 匿名 / nas 用户认证） |
 | Tailscale | — | 安全组网与远程访问 |
 | Gitea | 3000（Web）/ 22（git SSH） | 自托管 Git 服务，内置 GitHub Actions 兼容 CI（job 容器经 Podman 运行）与 OCI 镜像仓库 |
-| 知识库 Docs | 8080 | 统一知识库中心（单一 MkDocs 站点）：`<nas-ip>:8080/` 统一主页 + 统一导航 + 全站搜索，各知识库位于 `/owner/name/`；引擎仓库（nas-docs）经 Actions 把各仓库 docs/ 合并为单一站点 → 直接写入站点根，Caddy 静态服务 |
+| 知识库 Docs | 8080 | 统一知识库中心（单一 MkDocs 站点）：`<nas-ip>:8080/` 统一主页 + 统一导航 + 全站搜索，各知识库位于 `/owner/name/`；引擎仓库（nas-docs）经 Actions 把各仓库 docs/ 合并为单一站点 → 直接写入站点根，Caddy 静态服务；另经 Tailscale Serve 提供尾网 HTTPS 入口 `https://<机器名>.ts.net/`（供强制 https 的爬虫，仅 tailnet 内可达） |
 | 内存调优 | — | zram 压缩交换（物理内存 50%）+ 内核内存策略（swappiness/vfs_cache_pressure）+ systemd-oomd 防冻结 |
 
 ### Gitea Actions 首次配置
@@ -223,6 +223,7 @@ ss -tln | grep 8080                         # Caddy 对外端口监听
 systemctl is-active caddy                   # Caddy 服务
 curl -sf http://127.0.0.1:8080/ | grep -o 'NAS 知识库中心'   # 主页（MkDocs 聚合所有注册知识库）
 git ls-remote http://127.0.0.1:3000/<gitea-user>/nas-docs.git refs/heads/pages  # 引擎 pages 信号分支存在
+tailscale serve status                    # 应显示 https://<机器名>.ts.net/ → http://127.0.0.1:8080
 
 # zram / GC
 zramctl                                  # 应见 /dev/zram0 [SWAP]
