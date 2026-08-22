@@ -1,9 +1,0 @@
-{
-  "repos": [
-    {
-      "owner": "zhou",
-      "name": "nas-nix",
-      "desc": "NAS 声明式配置与运维文档"
-    }
-  ]
-}

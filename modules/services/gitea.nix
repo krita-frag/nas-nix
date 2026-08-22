@@ -68,7 +68,7 @@
       # 实机均可移植。
       network: "host"
       force_pull: false
-      # 挂载知识库站点根：docs-hub workflow 直接写入聚合构建产物
+      # 挂载知识库站点根：nas-docs 引擎 workflow 直接写入聚合构建产物
       # （Gitea HTTP 推送不执行 post-receive.d 钩子，故由 runner 容器部署）
       # 注意：act 仅允许挂载 valid_volumes 白名单内的宿主路径，未列入会被静默忽略
       options: "-e HOME=/root -v /var/www/docs:/var/www/docs"

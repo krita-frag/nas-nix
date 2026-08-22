@@ -8,7 +8,7 @@
 #   ./deploy.sh dry-run         # 构建但不切换（预演）
 #   ./deploy.sh rollback        # 回滚到上一代
 #   ./deploy.sh smoke           # 运行冒烟测试
-#   ./deploy.sh publish         # 发布知识库中心：推 GitHub + Gitea → Actions 统一构建 → 部署
+#   ./deploy.sh publish         # 发布知识库中心：触发 nas-docs Actions 统一构建 → 部署
 #   TARGET=<ip> ./deploy.sh     # 指定目标主机（实机接入时用真实 IP 覆盖）
 #
 set -euo pipefail
@@ -90,17 +90,19 @@ nix-env --list-generations --profile /nix/var/nix/profiles/system | wc -l
 SMOKE
     ;;
   publish)
-    echo "==> 发布知识库中心（推 hub main → Actions 统一构建所有注册知识库 → 部署）"
-    pages_before=$(git ls-remote gitea refs/heads/pages | cut -f1)
-    echo "==> 推送 GitHub（经本地代理 127.0.0.1:7897）"
-    git -c http.proxy=http://127.0.0.1:7897 push origin main
-    echo "==> 推送 Gitea（触发 CI 统一构建与部署）"
-    git push gitea main
+    echo "==> 发布知识库中心：触发 zhou/nas-docs Actions 统一构建（内容仓库每 6h 定时自动同步，此处立即重建）"
+    # 引擎与注册点位于独立仓库 zhou/nas-docs；pages 信号分支经 git ls-remote 轮询（仓库公开，无需认证）
+    DOCS_REPO="http://${TARGET}:3000/zhou/nas-docs.git"
+    pages_before=$(git ls-remote "${DOCS_REPO}" refs/heads/pages | cut -f1)
+    echo "==> 触发 Actions 构建（build.yml @ main，经 Gitea API workflow_dispatch）"
+    curl -sf -u "${GITEA_USER:-zhou}:${GITEA_PASS:?请提供 GITEA_PASS（Gitea API 口令，用于触发构建）}" -X POST \
+      "http://${TARGET}:3000/api/v1/repos/zhou/nas-docs/actions/workflows/build.yml/dispatches" \
+      -H 'Content-Type: application/json' -d '{"ref":"main"}'
     echo "==> 等待 Actions 重建 pages 分支（最多 5 分钟）..."
     pages_after=""
     i=0
     while [ $i -lt 300 ]; do
-      pages_after=$(git ls-remote gitea refs/heads/pages 2>/dev/null | cut -f1)
+      pages_after=$(git ls-remote "${DOCS_REPO}" refs/heads/pages 2>/dev/null | cut -f1)
       [ -n "${pages_after}" ] && [ "${pages_after}" != "${pages_before}" ] && break
       sleep 2
       i=$((i + 2))

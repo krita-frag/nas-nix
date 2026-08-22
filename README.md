@@ -21,7 +21,6 @@
 │   └── nas/
 │       ├── default.nix              # 主机级配置组装
 │       └── hardware-configuration.nix
-├── docs-hub/                 # 知识库中心（Hub）：repos.json 单一注册点 + 单一 MkDocs 站点模板
 ├── modules/
 │   ├── system/               # 系统层模块
 │   └── services/             # 应用服务模块
@@ -78,7 +77,7 @@
 ./deploy.sh smoke           # 部署后冒烟验证
 ./deploy.sh dry-run         # 预演（构建但不切换）
 ./deploy.sh rollback        # 回滚到上一代
-./deploy.sh publish         # 发布知识库中心：推 GitHub + Gitea → Actions 聚合构建 → 钩子部署
+./deploy.sh publish         # 发布知识库中心：触发 nas-docs Actions 统一构建 → 部署
 TARGET=192.168.64.4 ./deploy.sh   # 指定目标主机
 ```
 
@@ -138,7 +137,7 @@ Tailscale 的节点注册要求持有凭据（auth key / OAuth client / 交互�
 | Samba | 445/139 | 家庭文件共享（public 匿名 / nas 用户认证） |
 | Tailscale | — | 安全组网与远程访问 |
 | Gitea | 3000（Web）/ 22（git SSH） | 自托管 Git 服务，内置 GitHub Actions 兼容 CI（job 容器经 Podman 运行）与 OCI 镜像仓库 |
-| 知识库 Docs | 8080 | 统一知识库中心（单一 MkDocs 站点）：`<nas-ip>:8080/` 统一主页 + 统一导航 + 全站搜索，各知识库位于 `/owner/name/`；hub push main 经 Actions 把各仓库 docs/ 合并为单一站点 → 直接写入站点根，Caddy 静态服务 |
+| 知识库 Docs | 8080 | 统一知识库中心（单一 MkDocs 站点）：`<nas-ip>:8080/` 统一主页 + 统一导航 + 全站搜索，各知识库位于 `/owner/name/`；引擎仓库（zhou/nas-docs）经 Actions 把各仓库 docs/ 合并为单一站点 → 直接写入站点根，Caddy 静态服务 |
 | 内存调优 | — | zram 压缩交换（物理内存 50%）+ 内核内存策略（swappiness/vfs_cache_pressure）+ systemd-oomd 防冻结 |
 
 ### Gitea Actions 首次配置
@@ -159,23 +158,24 @@ Gitea 部署后安装向导已锁定（`INSTALL_LOCK`），首次使用需一次
 
 ### 知识库中心（Docs）
 
-Docs 是**单一 MkDocs 站点**：单一注册点 `docs-hub/repos.json`，统一构建流水线，统一 UI（全站同一 Material 主题、同一导航、全站搜索，无子站割裂）。发布即 push hub，无 Webhook、无反向代理正则、无逐仓库钩子/token/workflow。
+Docs 是**单一 MkDocs 站点**：引擎独立于内容仓库，位于 **zhou/nas-docs**（唯一注册点 `repos.json` + 统一渲染），内容仓库只提供 Markdown。统一 UI（全站同一 Material 主题、同一导航、全站搜索，无子站割裂）。无 Webhook、无反向代理正则、无逐仓库钩子/token/workflow。
 
-架构（见 [docs-hub/build.sh](docs-hub/build.sh) 与 [modules/services/docs.nix](modules/services/docs.nix)）：
+架构（引擎 [zhou/nas-docs](http://192.168.64.4:3000/zhou/nas-docs) 的 `build.sh`，Nix 侧见 [modules/services/docs.nix](modules/services/docs.nix)）：
 
 ```
-push hub main → Gitea Actions 读 repos.json → clone 各内容仓库 docs/
-  → 合并到统一 docs_dir → 生成统一主页与 nav → 单一 mkdocs build
+push nas-docs main / 每 6h 定时 / 手动 dispatch
+  → Actions 读 repos.json → clone 各内容仓库（docs/ 或 .kb.yml 指定路径）
+  → 合并到统一 docs_dir（<owner>/<name>/）→ 生成统一主页与 nav → 单一 mkdocs build
   → 直接写入站点根 /var/www/docs → Caddy 静态服务 :8080
 ```
 
 为任意 Gitea 仓库注册知识库（内容仓库零配置，无需 mkdocs.yml / workflow / token / 钩子）：
 
-1. 内容仓库根目录放 `docs/` 知识库源（MkDocs Material Markdown，参考本仓库）
-2. 在 [docs-hub/repos.json](docs-hub/repos.json) 的 `repos` 列表加一行（owner/name + 可选 desc）
-3. 运行 `./deploy.sh publish`（推 hub 触发统一重建）或推送 hub main
+1. 内容仓库根目录放 `docs/` 知识库源（纯 Markdown），或加 `.kb.yml` 覆盖标题/路径/自定义导航
+2. 在引擎仓库 zhou/nas-docs 的 [repos.json](http://192.168.64.4:3000/zhou/nas-docs/src/branch/main/repos.json) 的 `repos` 列表加一行（owner/name + 可选 desc）
+3. 运行 `./deploy.sh publish`（触发引擎立即重建）或等待每 6h 定时自动同步
 
-之后 hub 每次重建自动把该仓库构建进统一站点，主页自动出现新卡片。
+之后引擎每次重建自动把该仓库构建进统一站点，主页自动出现新卡片。
 
 ### 自托管服务一键部署（Gitea → NAS）
 
@@ -218,8 +218,8 @@ ls /etc/containers/registries.conf.d/gitea-registry.conf  # 本机镜像仓库�
 # 知识库 Docs
 ss -tln | grep 8080                         # Caddy 对外端口监听
 systemctl is-active caddy                   # Caddy 服务
-curl -sf http://127.0.0.1:8080/ | grep -o 'NAS 知识库中心'   # 主页（Hugo 聚合所有注册知识库）
-ls /var/lib/gitea/repositories/zhou/nas-nix.git/hooks/post-receive.d/docs-deploy  # hub 部署钩子已投放
+curl -sf http://127.0.0.1:8080/ | grep -o 'NAS 知识库中心'   # 主页（MkDocs 聚合所有注册知识库）
+git ls-remote http://127.0.0.1:3000/zhou/nas-docs.git refs/heads/pages  # 引擎 pages 信号分支存在
 
 # zram / GC
 zramctl                                  # 应见 /dev/zram0 [SWAP]
