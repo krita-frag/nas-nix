@@ -58,6 +58,8 @@
 
     # 主页 index：构建期由 repos 列表生成（列知识库名 + 链接），激活时写入站点根。
     # 钩子只写各知识库子目录、不覆盖主页，因此主页只随配置更新。
+    # 同时在激活阶段预创建各仓库站点子目录并赋 gitea 所有权——
+    # post-receive 钩子以 gitea 用户运行，父目录必须可由 gitea 写入才能 mkdir 子目录。
     system.activationScripts.docsIndex = let
       indexHtml = pkgs.writeText "docs-index.html" (let
         items = lib.concatMapStringsSep "\n" (repo:
@@ -101,40 +103,47 @@
           </html>
         '');
     in
-    lib.mkAfter ''
-      mkdir -p ${config.services.docs.root}
-      install -o gitea -g gitea -m 0644 ${indexHtml} ${config.services.docs.root}/index.html
-    '';
+    lib.mkAfter (lib.concatStrings [
+      ''
+        mkdir -p ${config.services.docs.root}
+        chown gitea:gitea ${config.services.docs.root}
+      ''
+      (lib.concatMapStringsSep "\n" (repo: ''
+        mkdir -p ${config.services.docs.root}/${repo}
+        chown gitea:gitea ${config.services.docs.root}/${repo}
+      '') config.services.docs.repos)
+      ''
+        install -o gitea -g gitea -m 0644 ${indexHtml} ${config.services.docs.root}/index.html
+      ''
+    ]);
 
-    # 部署钩子：为每个已注册仓库投放一份通用 post-receive 钩子。
-    # 钩子从 GIT_DIR 推导 owner/name 并把 pages 分支检出到对应子目录；
-    # 同一份脚本对所有仓库通用。Gitea 升级/重建仓库可能重写包装脚本，
-    # 但不会改动 post-receive.d/ 内容。
-    system.activationScripts.docsHook = let
-      hookScript = pkgs.writeShellScript "docs-deploy" ''
-        # Gitea 可能以受限环境运行钩子（PATH 无 git），构建期烘焙 git/coreutils 路径
-        export PATH="${pkgs.git}/bin:${pkgs.coreutils}/bin:$PATH"
-        set -euo pipefail
-        root="${config.services.docs.root}"
-        while read -r _old _new ref; do
-          [ "''${ref}" = "refs/heads/pages" ] || continue
-          # GIT_DIR 形如 /var/lib/gitea/repositories/<owner>/<name>.git
-          repo="''${GIT_DIR#/var/lib/gitea/repositories/}"
-          repo="''${repo%.git}"
-          site="$root/''${repo}"
-          mkdir -p "$site"
-          git --git-dir="''${GIT_DIR}" --work-tree="$site" checkout -f pages
-          git --git-dir="''${GIT_DIR}" --work-tree="$site" clean -fdx
-          exit 0
-        done
-      '';
-    in
-    lib.mkAfter (
-      lib.concatMapStringsSep "\n" (repo: ''
-        hook_dir=/var/lib/gitea/repositories/${repo}.git/hooks/post-receive.d
-        mkdir -p "$hook_dir"
-        install -o gitea -g gitea -m 0755 ${hookScript} "$hook_dir/docs-deploy"
-      '') config.services.docs.repos
+    # 部署钩子：为每个已注册仓库投放一份 post-receive 钩子。
+    # Gitea 生成的包装脚本（hooks/post-receive）会逐个执行 post-receive.d/*
+    # 并把 stdin 逐行传入，但它只在自身 shell 内设置 GIT_DIR 而不导出，
+    # 因此钩子不能依赖 GIT_DIR——构建期直接把 git-dir 与站点子目录烘焙进脚本。
+    # Gitea 升级/重建仓库可能重写包装脚本，但不会改动 post-receive.d/ 内容。
+    system.activationScripts.docsHook = lib.mkAfter (
+      lib.concatMapStringsSep "\n" (repo: let
+        hookScript = pkgs.writeShellScript
+          "docs-deploy-${lib.strings.sanitizeDerivationName repo}" ''
+            # Gitea 可能以受限环境运行钩子（PATH 无 git），构建期烘焙 git/coreutils 路径
+            export PATH="${pkgs.git}/bin:${pkgs.coreutils}/bin:$PATH"
+            set -euo pipefail
+            site="${config.services.docs.root}/${repo}"
+            while read -r _old _new ref; do
+              [ "''${ref}" = "refs/heads/pages" ] || continue
+              mkdir -p "$site"
+              git --git-dir="/var/lib/gitea/repositories/${repo}.git" --work-tree="$site" checkout -f pages
+              git --git-dir="/var/lib/gitea/repositories/${repo}.git" --work-tree="$site" clean -fdx
+              exit 0
+            done
+          '';
+      in
+        ''
+          hook_dir=/var/lib/gitea/repositories/${repo}.git/hooks/post-receive.d
+          mkdir -p "$hook_dir"
+          install -o gitea -g gitea -m 0755 ${hookScript} "$hook_dir/docs-deploy"
+        '') config.services.docs.repos
     );
 
     networking.firewall.allowedTCPPorts = [ config.services.docs.port ];
