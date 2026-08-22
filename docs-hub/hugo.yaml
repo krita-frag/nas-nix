@@ -1,7 +1,0 @@
-# Hugo 配置：知识库中心聚合站点
-# 站点由 Gitea Actions 统一构建（见 .gitea/workflows/docs-hub.yml）：
-# 读取 repos.json → 逐一构建各内容仓库 MkDocs 产物到 static/<owner>/<name>/ →
-# 复制 repos.json 到 data/ → hugo 生成统一聚合主页 → 强推 pages 分支。
-baseURL: "http://localhost:8080/"
-title: "NAS 知识库中心"
-languageCode: "zh-CN"

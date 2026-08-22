@@ -6,8 +6,5 @@ result
 result-*
 /nix
 
-# docs-hub 构建产物（由 Gitea Actions 聚合构建生成）
-/docs-hub/static/
-/docs-hub/data/
-/docs-hub/public/
-/docs-hub/resources/
+# docs-hub 为构建模板与注册点：统一站点在 Gitea Actions 的 /tmp 临时目录构建，
+# 不在仓库内产生产物（docs-hub/mkdocs.yml、extra.css、repos.json、build.sh 均入库）

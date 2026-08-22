@@ -21,7 +21,7 @@
 │   └── nas/
 │       ├── default.nix              # 主机级配置组装
 │       └── hardware-configuration.nix
-├── docs-hub/                 # 知识库中心（Hub）：repos.json 单一注册点 + Hugo 聚合站点模板
+├── docs-hub/                 # 知识库中心（Hub）：repos.json 单一注册点 + 单一 MkDocs 站点模板
 ├── modules/
 │   ├── system/               # 系统层模块
 │   └── services/             # 应用服务模块
@@ -138,7 +138,7 @@ Tailscale 的节点注册要求持有凭据（auth key / OAuth client / 交互�
 | Samba | 445/139 | 家庭文件共享（public 匿名 / nas 用户认证） |
 | Tailscale | — | 安全组网与远程访问 |
 | Gitea | 3000（Web）/ 22（git SSH） | 自托管 Git 服务，内置 GitHub Actions 兼容 CI（job 容器经 Podman 运行）与 OCI 镜像仓库 |
-| 知识库 Docs | 8080 | 统一知识库中心（聚合单站）：`<nas-ip>:8080/` 主页（Hugo）聚合所有注册知识库，各库位于 `/owner/name/`（MkDocs Material）；hub push main 经 Actions 统一构建 → 强推 pages → post-receive 钩子检出到站点根，Caddy 静态服务 |
+| 知识库 Docs | 8080 | 统一知识库中心（单一 MkDocs 站点）：`<nas-ip>:8080/` 统一主页 + 统一导航 + 全站搜索，各知识库位于 `/owner/name/`；hub push main 经 Actions 把各仓库 docs/ 合并为单一站点 → 直接写入站点根，Caddy 静态服务 |
 | 内存调优 | — | zram 压缩交换（物理内存 50%）+ 内核内存策略（swappiness/vfs_cache_pressure）+ systemd-oomd 防冻结 |
 
 ### Gitea Actions 首次配置
@@ -159,21 +159,21 @@ Gitea 部署后安装向导已锁定（`INSTALL_LOCK`），首次使用需一次
 
 ### 知识库中心（Docs）
 
-Docs 是**聚合式单站**：单一注册点 `docs-hub/repos.json`，统一构建流水线，统一 UI（内容仓库全部 MkDocs Material + 主页 Hugo 卡片聚合）。发布即 push hub，无 Webhook、无反向代理正则、无逐仓库钩子/token/workflow。
+Docs 是**单一 MkDocs 站点**：单一注册点 `docs-hub/repos.json`，统一构建流水线，统一 UI（全站同一 Material 主题、同一导航、全站搜索，无子站割裂）。发布即 push hub，无 Webhook、无反向代理正则、无逐仓库钩子/token/workflow。
 
 架构（见 [docs-hub/build.sh](docs-hub/build.sh) 与 [modules/services/docs.nix](modules/services/docs.nix)）：
 
 ```
-push hub main → Gitea Actions 读 repos.json → 逐一构建各内容仓库 MkDocs 产物
-  → 拷贝到 static/<owner>/<name>/ → Hugo 生成统一主页 → 强推 pages 分支
-  → NAS post-receive 钩子检出到站点根 /var/www/docs → Caddy 静态服务 :8080
+push hub main → Gitea Actions 读 repos.json → clone 各内容仓库 docs/
+  → 合并到统一 docs_dir → 生成统一主页与 nav → 单一 mkdocs build
+  → 直接写入站点根 /var/www/docs → Caddy 静态服务 :8080
 ```
 
-为任意 Gitea 仓库注册知识库（内容仓库零配置，无需 workflow / token / 钩子）：
+为任意 Gitea 仓库注册知识库（内容仓库零配置，无需 mkdocs.yml / workflow / token / 钩子）：
 
-1. 内容仓库根目录放 `mkdocs.yml` + `docs/` 知识库源（MkDocs Material，参考本仓库）
+1. 内容仓库根目录放 `docs/` 知识库源（MkDocs Material Markdown，参考本仓库）
 2. 在 [docs-hub/repos.json](docs-hub/repos.json) 的 `repos` 列表加一行（owner/name + 可选 desc）
-3. 运行 `./deploy.sh publish`（推 hub 触发聚合重建）或推送 hub main
+3. 运行 `./deploy.sh publish`（推 hub 触发统一重建）或推送 hub main
 
 之后 hub 每次重建自动把该仓库构建进统一站点，主页自动出现新卡片。
 

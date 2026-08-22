@@ -68,7 +68,9 @@
       # 实机均可移植。
       network: "host"
       force_pull: false
-      options: "-e HOME=/root"
+      # 挂载知识库站点根：docs-hub workflow 直接写入聚合构建产物
+      # （Gitea HTTP 推送不执行 post-receive.d 钩子，故由 runner 容器部署）
+      options: "-e HOME=/root -v /var/www/docs:/var/www/docs"
       docker_host: unix:///run/docker.sock
 
     # Actions 缓存目录：置于 runner 状态目录内（系统用户 HOME=/var/empty 无写权限）
