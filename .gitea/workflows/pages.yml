@@ -20,9 +20,12 @@ jobs:
       - name: 构建 MkDocs
         working-directory: /tmp/repo
         run: |
-          apt-get install -y python3-pip >/dev/null
-          pip install -q mkdocs-material
-          mkdocs build --site-dir /tmp/site
+          apt-get install -y python3-pip python3-venv >/dev/null
+          # Debian Bookworm Python 受 PEP 668 保护，系统级 pip install 被拒，
+          # 故在虚拟环境中安装 mkdocs-material
+          python3 -m venv /tmp/venv
+          /tmp/venv/bin/pip install -q mkdocs-material
+          /tmp/venv/bin/mkdocs build --site-dir /tmp/site
       - name: 发布到 pages 分支
         env:
           GITEA_TOKEN: ${{ secrets.PAGES_TOKEN }}
