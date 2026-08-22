@@ -77,9 +77,12 @@
 ./deploy.sh smoke           # 部署后冒烟验证
 ./deploy.sh dry-run         # 预演（构建但不切换）
 ./deploy.sh rollback        # 回滚到上一代
-./deploy.sh publish         # 发布知识库中心：触发 nas-docs Actions 统一构建 → 部署
 TARGET=192.168.64.4 ./deploy.sh   # 指定目标主机
 ```
+
+知识库发布不在此脚本：引擎仓库 [nas-docs](https://github.com/krita-frag/nas-docs) 自带 `publish.sh` 触发统一构建。
+
+新机引导：GitHub 为主源、Gitea 为本地镜像。新 NAS 尚无 Gitea 时，从 GitHub 克隆本仓库与 nas-docs；Gitea 就绪后把两仓库镜像到 Gitea（`zhou/*`）。
 
 等价的原生命令（供自定义流程参考）：
 
@@ -173,7 +176,7 @@ push nas-docs main / 每 6h 定时 / 手动 dispatch
 
 1. 内容仓库根目录放 `docs/` 知识库源（纯 Markdown），或加 `.kb.yml` 覆盖标题/路径/自定义导航
 2. 在引擎仓库 zhou/nas-docs 的 [repos.json](http://192.168.64.4:3000/zhou/nas-docs/src/branch/main/repos.json) 的 `repos` 列表加一行（owner/name + 可选 desc）
-3. 运行 `./deploy.sh publish`（触发引擎立即重建）或等待每 6h 定时自动同步
+3. 在引擎仓库 zhou/nas-docs 运行 `GITEA_PASS=<口令> bash publish.sh`（触发立即重建）或等待每 6h 定时自动同步
 
 之后引擎每次重建自动把该仓库构建进统一站点，主页自动出现新卡片。
 
@@ -239,4 +242,4 @@ nix-env --list-generations --profile /nix/var/nix/profiles/system  # 存在多�
 
 ## 维护
 
-修改配置 → 提交（`git commit`）→ `./deploy.sh` 一键部署。密钥编辑见上文 agenix 一节。开发计划与部署细节以本地 `plans/DEVELOPMENT_PLAN.md` 为准（该目录不入库）。
+修改配置 → 提交（`git commit`）→ `./deploy.sh` 一键部署。密钥编辑见上文 agenix 一节。

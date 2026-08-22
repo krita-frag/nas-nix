@@ -8,8 +8,10 @@
 #   ./deploy.sh dry-run         # 构建但不切换（预演）
 #   ./deploy.sh rollback        # 回滚到上一代
 #   ./deploy.sh smoke           # 运行冒烟测试
-#   ./deploy.sh publish         # 发布知识库中心：触发 nas-docs Actions 统一构建 → 部署
 #   TARGET=<ip> ./deploy.sh     # 指定目标主机（实机接入时用真实 IP 覆盖）
+#
+# 知识库发布不在此脚本：引擎仓库 zhou/nas-docs 自带 publish.sh（Gitea API 触发构建）。
+# 新机引导从 GitHub 克隆本仓库与 nas-docs（GitHub 为主源，Gitea 为本地镜像）。
 #
 set -euo pipefail
 

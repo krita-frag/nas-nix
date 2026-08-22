@@ -19,6 +19,6 @@
 1. 内容仓库根目录放 `docs/` 知识库源（纯 Markdown，可选 `.kb.yml` 覆盖标题/路径/导航）；
 2. 在引擎仓库 `repos.json` 的 `repos` 列表加一行
    `{ "owner": ..., "name": ..., "desc": ... }`；
-3. 运行 `./deploy.sh publish`（触发引擎立即重建）或等待每 6h 定时自动同步。
+3. 在引擎仓库运行 `GITEA_PASS=<口令> bash publish.sh`（触发立即重建）或等待每 6h 定时自动同步。
 
 之后引擎每次重建都会自动把该仓库 Markdown 构建进统一站点，中心主页自动出现新卡片。

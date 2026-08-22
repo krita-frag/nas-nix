@@ -51,7 +51,7 @@
       };
     };
 
-    # 旧 nginx 仅服务 docs，已由 Caddy 取代，整体停用以减少运行面
+    # nginx 不承担本机静态服务（Caddy 提供），整体停用减少运行面
     services.nginx.enable = lib.mkDefault false;
 
     # 站点根目录：runner 容器（root）写入，Caddy 用户只读
