@@ -61,7 +61,12 @@
         
     container:
       privileged: false
-      network: ""
+      # host 网络：默认情况下 act_runner 为每个 job 创建隔离桥接网络，
+      # 容器内 127.0.0.1 指向容器自身而非宿主，workflow 将无法访问本机 Gitea
+      # （git clone / push 均走 127.0.0.1:3000）。改用宿主网络后，容器与宿主
+      # 共享网络命名空间，127.0.0.1:3000 直接可达，且不依赖任何具体 IP，VM 与
+      # 实机均可移植。
+      network: "host"
       force_pull: false
       options: "-e HOME=/root"
       docker_host: unix:///run/docker.sock
