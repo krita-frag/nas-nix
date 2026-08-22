@@ -185,6 +185,7 @@ Gitea 部署后安装向导已锁定（`INSTALL_LOCK`），首次使用需一次
 | `ubuntu-latest` 等 | Podman 容器（node:20-bookworm） | 通用/第三方 action | 含每次依赖安装 |
 
 - `nas-host` 的 job 直接以 `gitea-runner` 权限在宿主执行，信任边界扩大，仅限受信任仓库使用；需隔离时改用 `kb-builder`。
+- host job 复用宿主工具：runner PATH 指向 `config.system.path`（systemPackages 聚合），[tools.nix](modules/system/tools.nix) 预装的 git/python3/node/go/rust/gcc/make/cmake/ccache 等工具链对 job 直接可见，免每次下载安装；新增工具只需在该文件添加。
 - 预烘焙镜像在 NAS 本地构建（`bash runner/build-kb-image.sh`，与 runner 共用镜像存储免 registry push）；镜像随系统重装丢失，重建执行该脚本即可。
 - 知识库构建的 Python 依赖（mkdocs-material 等）复用持久缓存 venv（`/var/lib/gitea-runner/kb-cache` 或容器 `/kb-cache`），跨运行不重复 pip install。
 

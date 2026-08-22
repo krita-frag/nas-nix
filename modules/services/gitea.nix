@@ -96,9 +96,10 @@
     wantedBy = [ "multi-user.target" ];
     after = [ "gitea.service" "podman.socket" ];
     wants = [ "gitea.service" ];
-    # nas-host（本机直跑）依赖：把 git/python3/bash 注入 runner 进程 PATH，
-    # host job 继承后可直接执行（无需每次 apt-get）
-    path = with pkgs; [ git python3 bash ];
+    # nas-host（本机直跑）依赖：job 继承宿主工具。path 指向 config.system.path
+    # （systemPackages 聚合），故 tools.nix 预装的 git/python3/go/rust/make 等
+    # 对 host job 全部可见，免每次 apt-get/下载安装；bash 由系统自带
+    path = [ config.system.path ];
     serviceConfig = {
       User = "gitea-runner";
       Group = "gitea-runner";
