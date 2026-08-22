@@ -180,6 +180,8 @@ push nas-docs main / 每 6h 定时 / 手动 dispatch
 
 之后引擎每次重建自动把该仓库构建进统一站点，主页自动出现新卡片。
 
+**尾网 HTTPS 入口**（供强制 https 的爬虫抓取）：站点默认仅 HTTP 监听，另经 Tailscale Serve 挂到尾网 `https://<机器名>.ts.net/`（仅 tailnet 内可达、无公网暴露）。一次性手动步骤：在 [Tailscale 管理台](https://login.tailscale.com/admin) 启用 **Serve**，此后本机服务自动生效，无需重启。
+
 ### 自托管服务一键部署（Gitea → NAS）
 
 在 Gitea 开发的服务可一键部署到 NAS 测试：push 触发 Actions 经 Podman 构建镜像 → 推入 Gitea 内置镜像仓库 → NAS 本机运行（开发期 `docker run` 临时容器，稳定后 Quadlet/systemd 托管并固化进 NixOS）。完整流程、Actions 模板与 Quadlet 示例见 [docs/container-deploy.md](docs/container-deploy.md)。
@@ -223,7 +225,7 @@ ss -tln | grep 8080                         # Caddy 对外端口监听
 systemctl is-active caddy                   # Caddy 服务
 curl -sf http://127.0.0.1:8080/ | grep -o 'NAS 知识库中心'   # 主页（MkDocs 聚合所有注册知识库）
 git ls-remote http://127.0.0.1:3000/<gitea-user>/nas-docs.git refs/heads/pages  # 引擎 pages 信号分支存在
-tailscale serve status                    # 应显示 https://<机器名>.ts.net/ → http://127.0.0.1:8080
+tailscale serve status                    # 应显示 https://<机器名>.ts.net/ → http://127.0.0.1:8080（启用 Serve 前为 No serve config）
 
 # zram / GC
 zramctl                                  # 应见 /dev/zram0 [SWAP]

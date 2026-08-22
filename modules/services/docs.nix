@@ -57,18 +57,23 @@
     # 尾网 HTTPS 入口：Caddy 仅 HTTP 监听 :8080，强制 https 的抓取工具（WebFetch 类
     # LLM 爬虫）无法直连内网 http。经 tailscale serve 把站点挂到尾网 HTTPS
     # （https://<机器名>.ts.net/）：有效证书、无公网暴露、仅 tailnet 内节点可达，
-    # 站点 URL 不变，只是多一条 HTTPS 入口。serve 配置持久于 tailscaled 状态，
-    # 重启自动恢复；on-failure 重试覆盖首次加入组网（authKeyFile 自动登录）前的空窗。
+    # 站点 URL 不变，只是多一条 HTTPS 入口。serve 配置持久于 tailscaled 状态。
+    #
+    # 一次性手动步骤：Serve 需在 tailnet 管理台启用（https://login.tailscale.com/admin），
+    # 与认证密钥同理。未启用时 CLI 会挂住而非报错退出，故 TimeoutStartSec 兜底，
+    # 失败后按 Restart 周期重试——启用后下一次重试即生效，无需重启。
     systemd.services.tailscale-serve-docs = {
       description = "Expose docs site over tailnet HTTPS (tailscale serve)";
       after = [ "tailscaled.service" ];
       wants = [ "tailscaled.service" ];
       wantedBy = [ "multi-user.target" ];
+      startLimitIntervalSec = 0;
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
         Restart = "on-failure";
-        RestartSec = "10s";
+        RestartSec = "30s";
+        TimeoutStartSec = 30;
         ExecStart = "${pkgs.tailscale}/bin/tailscale serve --bg --https=443 http://127.0.0.1:${toString config.services.docs.port}";
       };
     };
