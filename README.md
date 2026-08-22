@@ -137,7 +137,7 @@ Tailscale 的节点注册要求持有凭据（auth key / OAuth client / 交互�
 | Samba | 445/139 | 家庭文件共享（public 匿名 / nas 用户认证） |
 | Tailscale | — | 安全组网与远程访问 |
 | Gitea | 3000（Web）/ 22（git SSH） | 自托管 Git 服务，内置 GitHub Actions 兼容 CI（job 容器经 Podman 运行）与 OCI 镜像仓库 |
-| 知识库 Docs | 8080 | 静态知识站（mkdocs，`<nas-ip>:8080/`；push main 经 Actions 构建 pages 分支，post-receive 钩子就地部署） |
+| 知识库 Docs | 8080 | 统一知识库中心：`<nas-ip>:8080/` 主页聚合所有已注册知识库，各库位于 `/owner/name/`；push main 经 Actions 构建 pages 分支，post-receive 钩子就地部署 |
 | 内存调优 | — | zram 压缩交换（物理内存 50%）+ 内核内存策略（swappiness/vfs_cache_pressure）+ systemd-oomd 防冻结 |
 
 ### Gitea Actions 首次配置
@@ -155,6 +155,19 @@ Gitea 部署后安装向导已锁定（`INSTALL_LOCK`），首次使用需一次
    ```
 
 4. 仓库内启用 Actions，`.gitea/workflows/*.yaml` 即按 GitHub Actions 语法执行；job 容器由 **Podman** 运行（经 Docker 兼容 socket），镜像走已配置的 Docker Hub 加速。
+
+### 知识库中心（Docs）
+
+Docs 是**统一知识库中心**：主页 `http://<nas-ip>:8080/` 聚合所有已注册知识库的链接，各库独立部署在 `/owner/name/` 子路径，互不耦合、可独立更新。注册机制收敛在 [modules/services/docs.nix](modules/services/docs.nix)：`services.docs.repos` 列表决定注册哪些仓库，构建期自动生成主页 index，并为每个仓库投放同一条 post-receive 钩子（从 `GIT_DIR` 推导仓库名，push pages 分支即检出到对应子目录）。
+
+为任意 Gitea 仓库注册知识库（无需改 NAS 部署以外的代码）：
+
+1. 仓库根目录放 `mkdocs.yml` + `docs/` 知识库源（参考本仓库）
+2. 复制 [docs/kb-workflow.example.yml](docs/kb-workflow.example.yml) 为仓库的 `.gitea/workflows/docs.yml`（已用 `${{ github.repository }}` 自适应仓库，无需改路径）
+3. 仓库设置添加 `PAGES_TOKEN` secret（write:repository 权限 API token，用于推送 pages 分支）
+4. 在本仓库 [hosts/nas/default.nix](hosts/nas/default.nix) 的 `services.docs.repos` 加一行 `owner/name`，然后 `./deploy.sh`
+
+之后 push main 自动构建 → 强推 pages → 钩子就地部署，中心主页自动出现新链接。
 
 ### 自托管服务一键部署（Gitea → NAS）
 
@@ -197,7 +210,7 @@ ls /etc/containers/registries.conf.d/gitea-registry.conf  # 本机镜像仓库�
 # 知识库 Docs
 ss -tln | grep 8080                         # nginx 对外端口监听
 systemctl is-active nginx                   # nginx 服务
-curl -sf http://127.0.0.1:8080/ | head -1   # 知识库站点根响应
+curl -sf http://127.0.0.1:8080/ | grep -o '知识库中心'   # 主页 index（聚合所有已注册知识库）
 ls /var/lib/gitea/repositories/zhou/nas-nix.git/hooks/post-receive.d/docs-deploy  # 部署钩子已投放
 
 # zram / GC

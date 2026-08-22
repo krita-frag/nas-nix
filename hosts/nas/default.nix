@@ -44,6 +44,11 @@
   # 运行时 passwd 改动在下次重建时还原，保证系统可复现与干净。
   users.mutableUsers = false;
 
-  # 知识库静态站：push 触发 Actions 构建后由 post-receive 钩子部署（见 modules/services/docs.nix）
-  services.docs.enable = true;
+  # 统一知识库中心：已注册仓库 push pages 分支即自动部署到 /owner/name/，
+  # 主页 index 聚合所有已注册知识库的链接（见 modules/services/docs.nix）。
+  # 注册新知识库：在此列表加一行 "owner/name"，并在该仓库放 docs/kb-workflow.example.yml 模板。
+  services.docs = {
+    enable = true;
+    repos = [ "zhou/nas-nix" ];
+  };
 }
