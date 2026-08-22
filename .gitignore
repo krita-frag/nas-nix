@@ -5,6 +5,3 @@
 result
 result-*
 /nix
-
-# 统一站点由引擎仓库（zhou/nas-docs）在 Gitea Actions 的 /tmp 临时目录构建，
-# 不在仓库内产生产物

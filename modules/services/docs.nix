@@ -1,11 +1,11 @@
 { config, lib, ... }:
 
-# 统一知识库中心：单一 MkDocs 站点，无子站割裂。引擎为独立仓库 zhou/nas-docs。
+# 统一知识库中心：单一 MkDocs 站点，无子站割裂。引擎为独立仓库 nas-docs。
 #
 # 架构（单一注册点 + 统一 UI，引擎与内容仓库解耦）：
 #   - 内容仓库：任意 Gitea 仓库只需根目录有 docs/（纯 Markdown 源），或 .kb.yml
 #     覆盖 标题/文档路径/自定义导航，零配置（无需各自 mkdocs.yml / workflow / token / 钩子）；
-#   - 引擎（zhou/nas-docs）：repos.json 为唯一注册点（owner/name + 可选 desc），
+#   - 引擎（nas-docs）：repos.json 为唯一注册点（owner/name + 可选 desc），
 #     build.sh 读 repos.json clone 各内容仓库、按 <owner>/<name>/ 合并 docs 到统一
 #     docs_dir，生成统一主页（卡片聚合）与 MkDocs nav（每个知识库一个顶部 tab），
 #     以单一 mkdocs.yml（Material 主题）构建完整站点——统一主题、统一导航、全站搜索；
@@ -34,8 +34,8 @@
   };
 
   config = lib.mkIf config.services.docs.enable {
-    # 站点内容完全由引擎仓库（zhou/nas-docs）Actions 构建产物提供，本模块只负责静态服务与目录准备；
-    # 注册点 repos.json 位于引擎仓库（zhou/nas-docs），仅驱动 workflow，Nix 侧无需读取。
+    # 站点内容完全由引擎仓库（nas-docs）Actions 构建产物提供，本模块只负责静态服务与目录准备；
+    # 注册点 repos.json 位于引擎仓库（nas-docs），仅驱动 workflow，Nix 侧无需读取。
 
     # Caddy 静态服务站点根：纯文件服务，无代理、无路径重写，URL 即站点根。
     # 仅端口监听（无 host）不触发 ACME。

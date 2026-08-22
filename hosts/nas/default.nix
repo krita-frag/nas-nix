@@ -44,7 +44,7 @@
   # 运行时 passwd 改动在下次重建时还原，保证系统可复现与干净。
   users.mutableUsers = false;
 
-  # 统一知识库中心：引擎（zhou/nas-docs）push main / 6h 定时 / 手动 dispatch 经 Actions
+  # 统一知识库中心：引擎（nas-docs）push main / 6h 定时 / 手动 dispatch 经 Actions
   # 聚合构建所有注册知识库并写入站点根，Caddy 静态服务（见 modules/services/docs.nix）。
   # 注册新知识库：在引擎仓库 repos.json 的 repos 列表加一行即可（无需改本文件）。
   services.docs = {
