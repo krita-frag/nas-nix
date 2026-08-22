@@ -33,11 +33,14 @@ NAS flake 增加 input 引用 → hosts/nas 导入模块 → ./deploy.sh 声明�
 ## 3. NAS 端引用启用
 
 **flakes 输入**（[flake.nix](../flake.nix) 的 `inputs` 增加；Gitea 默认走 HTTP 匿名只读）：
+> 注意：flake 求值发生在**管理机**（`./deploy.sh` 在 macOS 上先求值再远程构建），
+> 地址必须从管理机可达——`<nas-addr>` 用 NAS 的 IP 或 tailnet 域名，不能用 `127.0.0.1`
+> （那是管理机自身而非 NAS）。
 
 ```nix
 inputs = {
   # ...现有 inputs...
-  myapp.url = "git+http://127.0.0.1:3000/<owner>/<repo>?ref=main";
+  myapp.url = "git+http://<nas-addr>:3000/<owner>/<repo>?ref=main";
 };
 ```
 
@@ -69,8 +72,8 @@ modules = [
 
 ## 4. 工具 / 定时任务类
 
-- **命令行工具**：NAS 上直接 `nix run git+http://127.0.0.1:3000/<owner>/<repo>#default`
-  （运行远端 flake 的包，一条命令，无需 clone/install）
+- **命令行工具**：NAS 上直接 `nix run git+http://<nas-addr>:3000/<owner>/<repo>#default`
+  （运行远端 flake 的包，一条命令，无需 clone/install；`<nas-addr>` 同第 3 节，须从执行机可达）
 - **定时任务**：在 `nixosModules.default` 里声明 `systemd.timers`（模板已含每日任务示例），
   随系统托管、无需常驻进程
 

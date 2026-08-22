@@ -1,12 +1,15 @@
 { config, lib, pkgs, ... }:
 
-# SSH：密钥认证，禁用密码登录
+# SSH：密钥认证，禁用密码登录；限尝试次数并保持长连接探活（防御纵深）
 {
   services.openssh = {
     enable = true;
     settings = {
       PasswordAuthentication = false;
       KbdInteractiveAuthentication = false;
+      MaxAuthTries = 3;
+      ClientAliveInterval = 120;
+      ClientAliveCountMax = 3;
     };
   };
 

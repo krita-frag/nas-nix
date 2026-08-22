@@ -70,10 +70,12 @@
       force_pull: false
       # 挂载知识库站点根：nas-docs 引擎 workflow 直接写入聚合构建产物
       # （Gitea HTTP 推送不执行 post-receive.d 钩子，故由 runner 容器部署）
+      # 另挂载构建缓存目录 /kb-cache：复用 venv 与 pip 缓存，避免每次重建重复下载依赖
       # 注意：act 仅允许挂载 valid_volumes 白名单内的宿主路径，未列入会被静默忽略
-      options: "-e HOME=/root -v /var/www/docs:/var/www/docs"
+      options: "-e HOME=/root -v /var/www/docs:/var/www/docs -v /var/lib/gitea-runner/kb-cache:/kb-cache"
       valid_volumes:
         - /var/www/docs
+        - /var/lib/gitea-runner/kb-cache
       docker_host: unix:///run/docker.sock
 
     # Actions 缓存目录：置于 runner 状态目录内（系统用户 HOME=/var/empty 无写权限）

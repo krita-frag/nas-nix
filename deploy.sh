@@ -81,8 +81,8 @@ echo "--- 关键服务 ---"
 for s in samba-smbd syncthing docker; do
   printf "%-14s %s\n" "$s" "$(systemctl is-active $s)"
 done
-echo "--- 关键端口 ---"
-ss -tln | grep -E ':(9090|9443|8384|445)\b' | awk '{print $4}'
+echo "--- 关键端口 ---
+ss -tln | grep -E ':(3000|8080|9090|8384|445|22000)\b' | awk '{print $4}'
 echo "--- zram ---"
 zramctl | grep SWAP || echo "zram 未启用"
 echo "--- Docker 容器 ---"

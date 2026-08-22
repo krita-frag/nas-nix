@@ -82,7 +82,7 @@ TARGET=192.168.64.4 ./deploy.sh   # 指定目标主机
 
 知识库发布不在此脚本：引擎仓库 [nas-docs](https://github.com/krita-frag/nas-docs) 自带 `publish.sh` 触发统一构建。
 
-新机引导：GitHub 为主源、Gitea 为本地镜像。新 NAS 尚无 Gitea 时，从 GitHub 克隆本仓库与 nas-docs；Gitea 搭建好后把两仓库镜像到 Gitea（`<gitea-user>/*`）。
+新机引导：GitHub 为主源、Gitea 为本地镜像。新 NAS 尚无 Gitea 时，从 GitHub 克隆本仓库与 nas-docs；Gitea 搭建好后把两仓库镜像到 Gitea（`<gitea-user>/*`）。文内 GitHub 链接为本项目实际地址，fork 或改名后请替换为你自己的地址。
 
 等价的原生命令（供自定义流程参考）：
 
@@ -92,6 +92,19 @@ nix run .#nixos-rebuild -- switch \
   --build-host root@<nas-ip> \
   --target-host root@<nas-ip>
 ```
+
+### 新机引导清单
+
+从零搭建一台 NAS（VM 或实机）的完整步骤：
+
+1. **安装 NixOS**：生成并保存 `hardware-configuration.nix`（VM 用仓库内 qemu-guest 版；实机用 `nixos-generate-config` 重新生成）
+2. **克隆仓库**：从 GitHub 克隆本仓库与 [nas-docs](https://github.com/krita-frag/nas-docs)（GitHub 为主源，Gitea 为本地镜像）
+3. **授权密钥**：把新机 SSH 主机公钥（`/etc/ssh/ssh_host_ed25519_key.pub`）加入 [secrets/secrets.nix](secrets/secrets.nix) 接收者，在 `secrets/` 执行 `nix run .#agenix -- -r` 重加密全部 `.age`；管理机公钥已在 [modules/system/ssh.nix](modules/system/ssh.nix) 与 secrets.nix 声明
+4. **首次部署**：`TARGET=<新机IP> ./deploy.sh`（首次构建较久）；若密钥仍解不开 `.age`，回到上一步确认接收者
+5. **Gitea 初始化**：浏览器打开 `http://<nas-ip>:3000` 创建管理员账号（仅一次）
+6. **注册 runner**：Gitea 后台生成注册令牌 → NAS 上写入 `/var/lib/gitea-runner/registration-token` → `systemctl restart gitea-runner`（见「内置服务」节）
+7. **镜像仓库**：把 nas-nix、nas-docs 推到 Gitea（`<gitea-user>/*`），后续 Actions 从 Gitea 拉取构建
+8. **启用 Serve**（可选）：在 [Tailscale 管理台](https://login.tailscale.com/admin) 启用 Serve，供强制 https 的爬虫经尾网 HTTPS 访问知识库（最多 1 小时内自动生效）
 
 ### 升级依赖
 
@@ -136,7 +149,7 @@ Tailscale 的节点注册要求持有凭据（auth key / OAuth client / 交互�
 | SSH | 22 | 密钥认证，禁用密码登录 |
 | Cockpit | 9090 | 系统状态监控与管理面板（`https://<nas-ip>:9090`，root 登录，口令经 agenix 管理，含 Podman 容器管理） |
 | Podman | — | 无守护进程 OCI 容器运行时（容器经 Cockpit 的 podman 模块管理） |
-| Syncthing | 8384（GUI）/ 22000（同步） | 多设备文件实时同步 |
+| Syncthing | 8384（GUI，仅本机）/ 22000（同步） | 多设备文件实时同步 |
 | Samba | 445/139 | 家庭文件共享（public 匿名 / nas 用户认证） |
 | Tailscale | — | 安全组网与远程访问 |
 | Gitea | 3000（Web）/ 22（git SSH） | 自托管 Git 服务，内置 GitHub Actions 兼容 CI（job 容器经 Podman 运行）与 OCI 镜像仓库 |
