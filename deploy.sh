@@ -8,6 +8,7 @@
 #   ./deploy.sh dry-run         # 构建但不切换（预演）
 #   ./deploy.sh rollback        # 回滚到上一代
 #   ./deploy.sh smoke           # 运行冒烟测试
+#   ./deploy.sh publish         # 发布知识库：推 GitHub + Gitea → Actions → 钩子部署
 #   TARGET=<ip> ./deploy.sh     # 指定目标主机（实机接入时用真实 IP 覆盖）
 #
 set -euo pipefail
@@ -88,8 +89,36 @@ echo "--- 系统 generation 数 ---"
 nix-env --list-generations --profile /nix/var/nix/profiles/system | wc -l
 SMOKE
     ;;
+  publish)
+    echo "==> 发布知识库（GitHub + Gitea → Actions → post-receive 钩子部署）"
+    pages_before=$(git ls-remote gitea refs/heads/pages | cut -f1)
+    echo "==> 推送 GitHub（经本地代理 127.0.0.1:7897）"
+    git -c http.proxy=http://127.0.0.1:7897 push origin main
+    echo "==> 推送 Gitea（触发 CI 构建与钩子部署）"
+    git push gitea main
+    echo "==> 等待 Actions 重建 pages 分支（最多 5 分钟）..."
+    pages_after=""
+    i=0
+    while [ $i -lt 300 ]; do
+      pages_after=$(git ls-remote gitea refs/heads/pages 2>/dev/null | cut -f1)
+      [ -n "${pages_after}" ] && [ "${pages_after}" != "${pages_before}" ] && break
+      sleep 2
+      i=$((i + 2))
+    done
+    if [ -z "${pages_after}" ] || [ "${pages_after}" = "${pages_before}" ]; then
+      echo "错误：pages 分支未更新，请检查 Gitea Actions 运行状态。" >&2
+      exit 1
+    fi
+    echo "==> pages 分支已更新（${pages_after}），等待钩子部署到站点..."
+    sleep 3
+    if ! ssh ${SSH_OPTS} "${REMOTE}" 'curl -sf http://127.0.0.1:8080/ >/dev/null'; then
+      echo "错误：站点不可访问。" >&2
+      exit 1
+    fi
+    echo "==> 发布完成：http://${TARGET}:8080/"
+    ;;
   *)
-    echo "用法: $0 [switch|dry-run|rollback|smoke]" >&2
+    echo "用法: $0 [switch|dry-run|rollback|smoke|publish]" >&2
     exit 1
     ;;
 esac

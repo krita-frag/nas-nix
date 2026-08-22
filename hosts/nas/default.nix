@@ -14,7 +14,7 @@
     ../../modules/system/nix-gc.nix
     ../../modules/services/syncthing.nix
     ../../modules/services/gitea.nix
-    ../../modules/services/pages.nix
+    ../../modules/services/docs.nix
     # agenix 密钥声明（加密文件在 secrets/*.age，规则文件 secrets/secrets.nix 仅供 CLI 使用）
     ../../modules/system/agenix.nix
   ];
@@ -44,6 +44,6 @@
   # 运行时 passwd 改动在下次重建时还原，保证系统可复现与干净。
   users.mutableUsers = false;
 
-  # Gitea Pages：统一域名静态站托管（见 modules/services/pages.nix）
-  services.pages.enable = true;
+  # 知识库静态站：push 触发 Actions 构建后由 post-receive 钩子部署（见 modules/services/docs.nix）
+  services.docs.enable = true;
 }

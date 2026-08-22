@@ -23,9 +23,6 @@
       # （Gitea 默认已启用，此处显式声明以文档化）
       packages.ENABLED = true;
       "packages.registry".ENABLED = true;
-      # Webhook 投递目标白名单：git-pages 监听在回环地址 127.0.0.1:8080，
-      # 默认 ALLOWED_HOST_LIST 不含回环地址，需显式放行否则 Webhook 投递被拒
-      security.ALLOWED_HOST_LIST = "private,127.0.0.1,::1";
     };
   };
 
