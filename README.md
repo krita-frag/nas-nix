@@ -37,6 +37,7 @@
 
 - NAS 已安装 NixOS，可从管理机密钥登录 `root@<nas-ip>`
 - NAS 已生成 SSH 主机密钥（`/etc/ssh/ssh_host_ed25519_key`）
+- **VM 与实机**：仓库内 [hardware-configuration.nix](hosts/nas/hardware-configuration.nix) 为测试 VM 的 qemu-guest 版（含 VM 磁盘 UUID 与 swap）。实机安装需在 NAS 上运行 `nixos-generate-config` 重新生成该文件（自动探测磁盘、引导器与挂载），再提交回仓库；部署时用 `TARGET=<实机IP>` 覆盖默认 VM 地址即可，无需改动其他配置
 
 ### macOS 管理机安装与配置
 
@@ -252,9 +253,38 @@ nix-env --list-generations --profile /nix/var/nix/profiles/system  # 存在多�
 
 ## 安全模型
 
-- SSH 仅密钥认证，禁用密码登录，管理机公钥在 [modules/system/ssh.nix](modules/system/ssh.nix) 声明
+### 暴露面（攻击面）
+
+- SSH 仅密钥认证（禁用密码/键盘交互登录），限尝试次数（`MaxAuthTries=3`），管理机公钥在 [modules/system/ssh.nix](modules/system/ssh.nix) 声明
 - 全部敏感数据经 agenix 加密，仅绑定主机 SSH 密钥可解密；密钥文件可安全提交到 Git
-- 防火墙默认开启，仅放行必需端口；远程访问经 Tailscale 私有网络
+- 防火墙默认开启，仅放行必需端口；远程访问经 Tailscale 私有组网（tailnet），无公网端口转发
+
+本机放行端口及暴露范围：
+
+| 端口 | 服务 | 暴露范围 |
+| --- | --- | --- |
+| 22 | SSH（仅密钥） | LAN / tailnet |
+| 3000 | Gitea Web | LAN / tailnet |
+| 8080 | 知识库 Docs（Caddy，公开只读） | LAN / tailnet，另经 tailscale serve 提供尾网 HTTPS |
+| 9090 | Cockpit（HTTPS + root 口令） | LAN / tailnet |
+| 445/139 | Samba 文件共享 | LAN |
+| 22000 | Syncthing 同步 | LAN |
+| 8384 | Syncthing GUI | 仅本机（127.0.0.1） |
+
+除 SSH 外，其余服务均未绑定到公网网卡，配合无公网端口映射，外部网络无法直达；Cockpit/Gitea 均为独立认证，知识库为公开只读静态站点。
+
+### 信任边界
+
+- **runner 容器为高信任主体**：`gitea-runner` 的 job 容器使用 host 网络（容器内 `127.0.0.1` 即宿主 Gitea），且持有 `PAGES_TOKEN`（write:repository 权限 API token）、可写挂载 `/var/www/docs` 与 `/kb-cache`（见 [gitea.nix](modules/services/gitea.nix)）。因此能触发引擎构建的主体即等同于可写入站点内容与宿主 Gitea 部分仓库。
+- 触发路径：push nas-docs main、6h 定时、手动 dispatch，以及被 `repos.json` 注册的内容仓库（其 Markdown 会被聚合进统一站点）。给仓库开放 Gitea 写权限或注册进知识库即视为加入该信任圈。
+- **外部访问者只读**：Caddy 静态服务无任何写能力；`gitea` 服务沙箱（`ProtectSystem=strict`）下 `/var/www/docs` 只读，部署由 runner 容器完成。
+- 知识库与 Gitea 走内网明文 HTTP，信任边界为 LAN/tailnet 本身，不应对公网暴露；如需公网访问请先置于 tailnet 或反向代理加 TLS。
+
+### 密钥轮换
+
+- **管理端 SSH 密钥**：更换密钥对后同步更新 [ssh.nix](modules/system/ssh.nix) 与 [secrets.nix](secrets/secrets.nix) 两处公钥，在 `secrets/` 执行 `nix run .#agenix -- -r` 重加密全部 `.age` 文件，再部署。
+- **PAGES_TOKEN / Gitea API token 泄露**：在 Gitea 后台撤销并重建 token，更新 nas-docs 仓库的 Actions secret（`PAGES_TOKEN`），旧 token 立即失效。
+- **换机迁移**：`.age` 文件加密时绑定机器 SSH 主机公钥，新机将自身公钥加入 `secrets.nix` 后重加密即可（见「敏感数据」节）。
 
 ## 维护
 

@@ -12,6 +12,7 @@
     ../../modules/system/tools.nix
     ../../modules/system/memory.nix
     ../../modules/system/nix-gc.nix
+    ../../modules/system/monitoring.nix
     ../../modules/services/syncthing.nix
     ../../modules/services/gitea.nix
     ../../modules/services/docs.nix
