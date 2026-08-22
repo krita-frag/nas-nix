@@ -13,7 +13,7 @@
       # 根分区水位：使用率 > 85% 视为高危（Samba/Syncthing/Gitea 数据同盘）
       usage=$(${pkgs.coreutils}/bin/df -P / | ${pkgs.gawk}/bin/awk 'NR==2{print $5}' | tr -d '%')
       if [ -n "$usage" ] && [ "$usage" -gt 85 ]; then
-        echo "WARN 磁盘使用率 \${usage}% 超过 85%" | ${pkgs.systemd}/bin/systemd-cat -t nas-monitor
+        echo "WARN 磁盘使用率 ''${usage}% 超过 85%" | ${pkgs.systemd}/bin/systemd-cat -t nas-monitor
       fi
 
       # 关键服务状态异常告警（正常 active/activating/deactivating 不输出）
