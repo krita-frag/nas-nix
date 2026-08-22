@@ -8,7 +8,7 @@
 #   ./deploy.sh dry-run         # 构建但不切换（预演）
 #   ./deploy.sh rollback        # 回滚到上一代
 #   ./deploy.sh smoke           # 运行冒烟测试
-#   ./deploy.sh publish         # 发布知识库：推 GitHub + Gitea → Actions → 钩子部署
+#   ./deploy.sh publish         # 发布知识库中心：推 GitHub + Gitea → Actions 聚合构建 → 钩子部署
 #   TARGET=<ip> ./deploy.sh     # 指定目标主机（实机接入时用真实 IP 覆盖）
 #
 set -euo pipefail
@@ -90,7 +90,7 @@ nix-env --list-generations --profile /nix/var/nix/profiles/system | wc -l
 SMOKE
     ;;
   publish)
-    echo "==> 发布知识库（GitHub + Gitea → Actions → post-receive 钩子部署）"
+    echo "==> 发布知识库中心（推 hub main → Actions 聚合构建所有注册知识库 → 钩子部署）"
     pages_before=$(git ls-remote gitea refs/heads/pages | cut -f1)
     echo "==> 推送 GitHub（经本地代理 127.0.0.1:7897）"
     git -c http.proxy=http://127.0.0.1:7897 push origin main

@@ -5,3 +5,9 @@
 result
 result-*
 /nix
+
+# docs-hub 构建产物（由 Gitea Actions 聚合构建生成）
+/docs-hub/static/
+/docs-hub/data/
+/docs-hub/public/
+/docs-hub/resources/

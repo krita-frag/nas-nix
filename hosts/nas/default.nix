@@ -44,11 +44,10 @@
   # 运行时 passwd 改动在下次重建时还原，保证系统可复现与干净。
   users.mutableUsers = false;
 
-  # 统一知识库中心：已注册仓库 push pages 分支即自动部署到 /owner/name/，
-  # 主页 index 聚合所有已注册知识库的链接（见 modules/services/docs.nix）。
-  # 注册新知识库：在此列表加一行 "owner/name"，并在该仓库放 docs/kb-workflow.example.yml 模板。
+  # 统一知识库中心：hub 仓库 push main 经 Actions 聚合构建所有注册知识库并强推
+  # pages 分支，post-receive 钩子检出到站点根，Caddy 静态服务（见 modules/services/docs.nix）。
+  # 注册新知识库：在 docs-hub/repos.json 的 repos 列表加一行即可（无需改本文件）。
   services.docs = {
     enable = true;
-    repos = [ "zhou/nas-nix" ];
   };
 }

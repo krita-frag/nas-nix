@@ -1,0 +1,49 @@
+# 知识库中心聚合发布：push hub main → 逐一构建所有注册知识库 → Hugo 统一站点 → 强推 pages 分支
+# NAS 的 post-receive 钩子检出 pages 分支到站点根即完成部署（见 modules/services/docs.nix）。
+#
+# 本 workflow 只存在于 hub 仓库（nas-nix），内容仓库无需任何 workflow / token / 钩子。
+# 注册新知识库：在 docs-hub/repos.json 的 repos 列表加一行（owner/name + 可选 desc），
+# 内容仓库根目录需有 mkdocs.yml + docs/（MkDocs Material）。仅 hub 仓库需 PAGES_TOKEN
+# （write:repository 权限 API token，用于 clone 各仓库与强推 pages）。
+name: Deploy Docs Hub
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 环境准备（git / python / hugo）
+        run: |
+          apt-get update && apt-get install -y git python3-pip python3-venv hugo >/dev/null
+      - name: 检出 hub 仓库
+        env:
+          GITEA_TOKEN: ${{ secrets.PAGES_TOKEN }}
+        run: |
+          git clone --depth 1 --branch main "http://oauth2:${GITEA_TOKEN}@127.0.0.1:3000/${{ github.repository }}.git" /tmp/hub
+      - name: 聚合构建所有注册知识库（docs-hub/build.sh）
+        env:
+          GITEA_TOKEN: ${{ secrets.PAGES_TOKEN }}
+        run: |
+          bash /tmp/hub/docs-hub/build.sh
+      - name: Hugo 生成统一站点
+        working-directory: /tmp/hub/docs-hub
+        run: |
+          hugo --minify --destination /tmp/hub-site
+      - name: 发布到 pages 分支
+        env:
+          GITEA_TOKEN: ${{ secrets.PAGES_TOKEN }}
+        run: |
+          cd /tmp/hub
+          git config --global user.name "nas-docs"
+          git config --global user.email "docs@nas.local"
+          git remote set-url origin "http://oauth2:${GITEA_TOKEN}@127.0.0.1:3000/${{ github.repository }}.git"
+          git branch -D pages 2>/dev/null || true
+          git checkout --orphan pages
+          git rm -rf . 2>/dev/null || true
+          cp -r /tmp/hub-site/. .
+          git add -A
+          git commit -m "pages: rebuild hub site"
+          git push -f origin pages
