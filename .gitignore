@@ -5,3 +5,19 @@
 result
 result-*
 /nix
+.tmp-work/
+
+# macOS 系统文件
+.DS_Store
+
+# 安装期临时脚本与 WiFi 凭据草稿（含明文 PSK，禁止入库）
+/.check-install.exp
+/.inject.exp
+/.reboot.exp
+/.run-nb.exp
+/.scp.exp
+/.nm-home-wifi.nmconnection
+
+# agenix 工作残留（旧加密副本 / 接收者清单）
+/secrets/.bak/
+/secrets/.recipients.txt

@@ -40,7 +40,7 @@
 
 - NAS 已安装 NixOS，可从管理机密钥登录 `root@<nas-ip>`
 - NAS 已生成 SSH 主机密钥（`/etc/ssh/ssh_host_ed25519_key`）
-- **VM 与实机**：仓库内 [hardware-configuration.nix](hosts/nas/hardware-configuration.nix) 为测试 VM 的 qemu-guest 版（含 VM 磁盘 UUID 与 swap）。实机安装需在 NAS 上运行 `nixos-generate-config` 重新生成该文件（自动探测磁盘、引导器与挂载），再提交回仓库；部署时用 `TARGET=<实机IP>` 覆盖默认 VM 地址即可，无需改动其他配置
+- **VM 与实机**：仓库内 [hardware-configuration.nix](hosts/nas/hardware-configuration.nix) 为实机版（NVMe 系统盘 + sda 数据盘 SRVDATA，by-label 挂载）。部署到其他机型时，在 NAS 上运行 `nixos-generate-config` 覆盖该文件以探测目标机磁盘/引导器/挂载，再提交回仓库；部署地址用 `TARGET=<目标IP>` 指定，无需改动其他配置
 
 ### macOS 管理机安装与配置
 
@@ -77,12 +77,12 @@
 一键部署（构建在 NAS 上完成 `--build-host`，切换也在 NAS 执行 `--target-host`）：
 
 ```bash
-./deploy.sh                 # 构建并切换（默认目标 192.168.64.4）
+./deploy.sh                 # 构建并切换（默认目标为实机 192.168.5.93）
 ./deploy.sh smoke           # 部署后冒烟验证
 ./deploy.sh dry-run         # 预演（构建但不切换）
 ./deploy.sh rollback        # 回滚到上一代
 ./deploy.sh check           # 本地配置校验（nix eval，无需 SSH，部署前快检）
-TARGET=192.168.64.4 ./deploy.sh   # 指定目标主机
+TARGET=<目标IP> ./deploy.sh   # 指定目标主机（如 VM 或地址变化的实机）
 ```
 
 知识库发布不在此脚本：引擎仓库 [nas-docs](https://github.com/krita-frag/nas-docs) 自带 `publish.sh` 触发统一构建。

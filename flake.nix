@@ -6,7 +6,9 @@
     # 经清华 TUNA 镜像拉取，规避 GitHub 访问问题
     nixpkgs.url = "git+https://mirrors.tuna.tsinghua.edu.cn/git/nixpkgs.git?ref=nixos-26.05&shallow=1";
     # 敏感数据加密：基于 age，密钥文件可安全入库
-    agenix.url = "github:ryantm/agenix";
+    # vendor 本地 path input：首装机（nixos-install）无法访问 GitHub，
+    # 从仓库内源码直接读取，安装/部署全程零 GitHub 依赖
+    agenix.url = "path:./vendor/agenix";
   };
 
   outputs = { self, nixpkgs, agenix, ... }:
@@ -39,6 +41,15 @@
           # agenix 模块：提供 age.secrets 声明式解密
           agenix.nixosModules.age
           ./hosts/nas
+        ];
+      };
+
+      # 首装最小系统：nixos-install 用，装完由 deploy.sh 推送完整配置
+      nixosConfigurations.nas-bootstrap = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        modules = [
+          agenix.nixosModules.age
+          ./hosts/nas-bootstrap.nix
         ];
       };
     };

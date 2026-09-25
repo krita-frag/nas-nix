@@ -16,8 +16,9 @@
 #
 set -euo pipefail
 
-# 当前测试用虚拟机地址；实机接入时以 TARGET 环境变量覆盖，无需改本文件
-TARGET="${TARGET:-192.168.64.4}"
+# 默认部署目标为实机（WiFi DHCP 地址随租约可能变化，稳定后可用固定 IP 或主机名替代）；
+# 操作 VM 测试环境时以 TARGET 环境变量覆盖
+TARGET="${TARGET:-192.168.5.93}"
 REMOTE="root@${TARGET}"
 FLAKE=".#nas"
 SSH_OPTS="-o BatchMode=yes -o ConnectTimeout=8"
