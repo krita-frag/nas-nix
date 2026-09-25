@@ -16,11 +16,22 @@
 #
 set -euo pipefail
 
-# 默认部署目标为实机（WiFi DHCP 地址随租约可能变化，稳定后可用固定 IP 或主机名替代）；
-# 操作 VM 测试环境时以 TARGET 环境变量覆盖
-TARGET="${TARGET:-192.168.5.93}"
+# 逻辑主机名：默认 nas，可用 HOST 环境变量切换。新增机器改这一个变量即可，
+# 对应 flake 自动从 hosts/<name>/ 推导 nixosConfigurations.<name>。
+# TARGET 为 SSH 目标（主机名/IP），默认取逻辑名，可用环境变量覆盖。
+HOST="${HOST:-nas}"
+FLAKE=".#${HOST}"
+if [ -z "${TARGET:-}" ]; then
+  TARGET="$HOST"
+  # macOS 无 getent，用 ping 探测主机名是否可解析；不入尾网时回退该主机直连地址
+  if ! ping -c 1 -t 2 -q "$TARGET" >/dev/null 2>&1; then
+    case "$HOST" in
+      nas) TARGET="${NAS_DIRECT_IP:-192.168.5.93}" ;;
+      *)   TARGET="$HOST" ;;
+    esac
+  fi
+fi
 REMOTE="root@${TARGET}"
-FLAKE=".#nas"
 SSH_OPTS="-o BatchMode=yes -o ConnectTimeout=8"
 
 # --- 确保 nix 可用（macOS Determinate Nix 不在默认 PATH）---
@@ -84,15 +95,15 @@ set -e
 echo "--- agenix 密钥挂载 ---"
 ls /run/agenix/
 echo "--- 关键服务 ---"
-for s in samba-smbd syncthing docker; do
+for s in samba-smbd syncthing gitea gitea-runner caddy; do
   printf "%-14s %s\n" "$s" "$(systemctl is-active $s)"
 done
 echo "--- 关键端口 ---"
 ss -tln | grep -E ':(3000|8080|9090|8384|445|22000)\b' | awk '{print $4}'
 echo "--- zram ---"
 zramctl | grep SWAP || echo "zram 未启用"
-echo "--- Docker 容器 ---"
-docker ps --format '{{.Names}} {{.Status}}' 2>/dev/null || echo "docker 不可用"
+echo "--- Podman 容器 ---"
+podman ps --format '{{.Names}} {{.Status}}' 2>/dev/null || echo "podman 不可用"
 echo "--- 系统 generation 数 ---"
 nix-env --list-generations --profile /nix/var/nix/profiles/system | wc -l
 SMOKE
@@ -101,11 +112,11 @@ SMOKE
     # 本地配置快检：不连 NAS，先确保 Nix 表达式可求值（捕获语法/模块错误），
     # 比等远程构建在 SSH 前暴露问题
     echo "==> 本地配置校验（nix eval）"
-    if ! nix eval --raw ".#nixosConfigurations.nas.config.networking.hostName" >/dev/null 2>&1; then
+    if ! nix eval --raw ".#nixosConfigurations.${HOST}.config.networking.hostName" >/dev/null 2>&1; then
       echo "错误：Nix 配置求值失败，请先修正再部署。" >&2
       exit 1
     fi
-    echo "OK：配置可求值，主机名=$(nix eval --raw ".#nixosConfigurations.nas.config.networking.hostName")"
+    echo "OK：配置可求值，主机名=$(nix eval --raw ".#nixosConfigurations.${HOST}.config.networking.hostName")"
     ;;
   *)
     echo "用法: $0 [switch|dry-run|rollback|smoke|check]" >&2

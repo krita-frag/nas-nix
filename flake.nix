@@ -24,6 +24,11 @@
         export KB_BUILDER_DOCKERFILE=${./runner/kb-builder.Dockerfile}
         exec bash ${./runner/build-kb-image.sh}
       '';
+      # 多主机脚手架：`nix run .#new-host -- <hostname>` 生成 hosts/<name>/ 占位配置
+      # 并提示接入步骤（硬件配置/注册/密钥重加密），新增机器零模板复制
+      new-host = system: nixpkgs.legacyPackages.${system}.writeShellScriptBin "new-host" ''
+        exec bash ${./scripts/new-host.sh} "$@"
+      '';
     in
     {
       packages = {
@@ -33,24 +38,37 @@
         aarch64-darwin.ssh-to-age = ssh-to-age "aarch64-darwin";
         aarch64-darwin.kb-builder = kb-builder "aarch64-darwin";
         x86_64-linux.kb-builder = kb-builder "x86_64-linux";
+        aarch64-darwin.new-host = new-host "aarch64-darwin";
+        x86_64-linux.new-host = new-host "x86_64-linux";
       };
 
-      nixosConfigurations.nas = nixpkgs.lib.nixosSystem {
-        system = "x86_64-linux";
-        modules = [
-          # agenix 模块：提供 age.secrets 声明式解密
-          agenix.nixosModules.age
-          ./hosts/nas
-        ];
-      };
-
-      # 首装最小系统：nixos-install 用，装完由 deploy.sh 推送完整配置
-      nixosConfigurations.nas-bootstrap = nixpkgs.lib.nixosSystem {
-        system = "x86_64-linux";
-        modules = [
-          agenix.nixosModules.age
-          ./hosts/nas-bootstrap.nix
-        ];
-      };
+      # 自动从 hosts/ 推导（仅用顶层条目，纯求值可靠）：
+      #   hosts/<name>/default.nix        → nixosConfigurations.<name>（完整配置）
+      #   hosts/<name>-bootstrap.nix       → nixosConfigurations.<name>-bootstrap（首装最小系统）
+      # 新增机器：建 hosts/<name>/ 目录（+ 可选同级 bootstrap 文件），零 flake 改动。
+      nixosConfigurations =
+        let
+          hostRoot = ./hosts;
+          entries = builtins.readDir hostRoot;
+          # 主机 = hosts/ 下的目录，目录名即主机名；排序保证输出确定
+          hostNames = builtins.sort (a: b: a < b)
+            (builtins.filter (n: entries.${n} == "directory")
+              (builtins.attrNames entries));
+          mkSystem = modules: nixpkgs.lib.nixosSystem {
+            system = "x86_64-linux";
+            modules = [ agenix.nixosModules.age ] ++ modules;
+          };
+          # 完整配置：import hosts/<name>/
+          full = builtins.listToAttrs (map
+            (n: { name = n; value = mkSystem [ (hostRoot + "/${n}") ]; })
+            hostNames);
+          # 首装最小系统：存在 hosts/<name>-bootstrap.nix → <name>-bootstrap
+          bootStrapHosts = builtins.filter
+            (n: entries.${n + "-bootstrap.nix"} == "regular") hostNames;
+          boot = builtins.listToAttrs (map
+            (n: { name = "${n}-bootstrap";
+                  value = mkSystem [ (hostRoot + "/${n}-bootstrap.nix") ]; })
+            bootStrapHosts);
+        in full // boot;
     };
 }

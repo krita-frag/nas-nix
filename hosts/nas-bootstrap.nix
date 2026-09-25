@@ -1,6 +1,7 @@
 # 首装最小系统（bootstrap）：SSH 密钥 + WiFi + agenix + Flakes。
 # 只装系统能力、不装服务（Gitea/Podman/备份等），避免在安装介质有限的
 # 内存里构建大闭包；系统启动后由 deploy.sh 推送 hosts/nas 完整配置。
+# flake 自动推导：存在本文件时生成 nixosConfigurations.<主机名>-bootstrap。
 { config, modulesPath, ... }:
 
 {
