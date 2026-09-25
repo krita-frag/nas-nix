@@ -28,6 +28,18 @@
   # DHCP 网络（由 NetworkManager 管理，虚拟网卡或实机网卡均可）
   networking.networkmanager.enable = true;
 
+  # mDNS 局域网主机名：启用 avahi，同 LAN 内可用 nas.local 访问（Web/SMB），
+  # 不依赖局域网 IP（IP 漂移/换网段主机名不变）。
+  services.avahi = {
+    enable = true;
+    nssmdns4 = true;
+    publish = {
+      enable = true;
+      addresses = true;
+      workstation = true;
+    };
+  };
+
   # 家庭 WiFi：NM 连接配置（含 PSK）经 agenix 解密后注入 system-connections。
   # 双频同名路由：5GHz（autoconnect-priority=10）优先、2.4GHz 兜底，NM 开机自动连接；
   # 有线口接入时 NM 同样自动 DHCP，无需额外配置。
@@ -80,9 +92,17 @@
     enable = true;
   };
 
-  # 尾网 HTTPS 入口：Gitea(:8443) 与 Docs(:443) 经 tailscale serve 挂到尾网
-  # （https://<机器名>.ts.net/），有效证书、仅 tailnet 内可达（见 modules/services/tailscale-serve.nix）
-  services.tailscaleServe.enable = true;
+  # 尾网 HTTPS 入口：Docs(:443 根)、Gitea(:8443)、Cockpit(:9443) 经 tailscale serve
+  # 挂到尾网稳定主机名 https://nas-1.tailf2ba32.ts.net[;PORT]（有效证书、仅 tailnet 可达），
+  # 不依赖局域网 IP（IP 漂移/换网段主机名不变）。见 modules/services/tailscale-serve.nix。
+  services.tailscaleServe = {
+    enable = true;
+    rules = [
+      { name = "docs";    https = 443;  target = "http://127.0.0.1:8080"; }
+      { name = "gitea";   https = 8443; target = "http://127.0.0.1:3000"; }
+      { name = "cockpit"; https = 9443; target = "https://127.0.0.1:9090"; }
+    ];
+  };
 
   # 集中备份：restic 加密快照。当前为 VM 测试阶段，repository 指向本地测试仓库
   # 以验证备份/恢复流程；实机部署时替换为真实目标（S3 原生或 rclone:<remote>:<path>），
