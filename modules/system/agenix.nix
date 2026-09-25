@@ -33,6 +33,13 @@
       group = "root";
       mode = "0400";
     };
+    # 家庭 WiFi 的 NetworkManager 连接配置（含 PSK，双频 5G/2.4G；见 hosts/nas/default.nix）
+    "wifi-nm" = {
+      file = ../../secrets/wifi-nm.age;
+      owner = "root";
+      group = "root";
+      mode = "0400";
+    };
   };
 
   # root 口令来自 agenix 解密文件，明文不入库、不落盘

@@ -28,9 +28,30 @@
   # DHCP 网络（由 NetworkManager 管理，虚拟网卡或实机网卡均可）
   networking.networkmanager.enable = true;
 
-  # 引导器（UEFI）
-  boot.loader.systemd-boot.enable = true;
-  boot.loader.efi.canTouchEfiVariables = true;
+  # 家庭 WiFi：NM 连接配置（含 PSK）经 agenix 解密后注入 system-connections。
+  # 双频同名路由：5GHz（autoconnect-priority=10）优先、2.4GHz 兜底，NM 开机自动连接；
+  # 有线口接入时 NM 同样自动 DHCP，无需额外配置。
+  environment.etc."NetworkManager/system-connections/home-wifi.nmconnection" = {
+    source = config.age.secrets.wifi-nm.path;
+    mode = "0600";
+  };
+
+  # 硬件固件：安装介质自带全套固件（wlo1 可用），但最小安装默认不带任何
+  # 固件（enableRedistributableFirmware 缺省 = enableAllFirmware = false），
+  # WiFi 驱动因缺固件无法 probe、网卡直接消失。必须显式开启。
+  hardware.enableRedistributableFirmware = true;
+
+  # 引导器（UEFI + GRUB，GPT 分区表）：与 nas-bootstrap 保持一致，
+  # 避免 deploy 切换时从 systemd-boot 换成 grub 引入引导器变更风险。
+  # efiInstallAsRemovable 写入 ESP 的 EFI/BOOT/BOOTX64.EFI 回退文件，
+  # 固件回退扫描可命中；canTouchEfiVariables=false，残留 NVRAM 项进系统后用 efibootmgr 清。
+  boot.loader.grub = {
+    enable = true;
+    device = "nodev";
+    efiSupport = true;
+    efiInstallAsRemovable = true;
+  };
+  boot.loader.efi.canTouchEfiVariables = false;
 
   # 二进制缓存换源：清华 TUNA 优先（cache.nixos.org 由系统自动附加）
   nix.settings = {
@@ -40,6 +61,10 @@
     # 启用 Flakes 与 nix-command（远程构建所需）
     experimental-features = [ "nix-command" "flakes" ];
   };
+
+  # swap 文件父目录：hardware-configuration.nix 声明 /swap/swapfile，
+  # mkswap 单元不会自建父目录（2026-09-09 实机部署时踩坑），tmpfiles 兜底创建
+  systemd.tmpfiles.rules = [ "d /swap 0700 root root -" ];
 
   # 系统版本（与 nixpkgs 通道一致，首次安装后不再变更）
   system.stateVersion = "26.05";
