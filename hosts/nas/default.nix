@@ -17,6 +17,7 @@
     ../../modules/services/gitea.nix
     ../../modules/services/docs.nix
     ../../modules/services/tailscale-serve.nix
+    ../../modules/services/backup.nix
     ../../modules/services/rustdesk.nix
     # agenix 密钥声明（加密文件在 secrets/*.age，规则文件 secrets/secrets.nix 仅供 CLI 使用）
     ../../modules/system/agenix.nix
