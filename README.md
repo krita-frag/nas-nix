@@ -159,6 +159,7 @@ Tailscale 的节点注册要求持有凭据（auth key / OAuth client / 交互�
 | Tailscale | — | 安全组网与远程访问 |
 | Gitea | 3000（Web）/ 22（git SSH） | 自托管 Git 服务，内置 GitHub Actions 兼容 CI（job 容器经 Podman 运行）与 OCI 镜像仓库；经 Tailscale Serve 提供尾网 HTTPS 入口 `https://<机器名>.ts.net:8443/`（仅 tailnet 内可达） |
 | 知识库 Docs | 8080 | 统一知识库中心（单一 MkDocs 站点）：`<nas-ip>:8080/` 统一主页 + 统一导航 + 全站搜索，各知识库位于 `/owner/name/`；引擎仓库（nas-docs）经 Actions 把各仓库 docs/ 合并为单一站点 → 直接写入站点根，Caddy 静态服务；另经 Tailscale Serve 提供尾网 HTTPS 入口 `https://<机器名>.ts.net/`（供强制 https 的爬虫，仅 tailnet 内可达） |
+| 包服务器 | 8081 | 局域网专用包服务器（多语言统一入口，nginx 反代 + 磁盘缓存）：Python（devpi 按需缓存 PyPI + 私有索引）、Go（athens，GOPROXY）、Rust（cargo 稀疏索引缓存转发）、npm（registry 缓存转发）、Zig / C++ 产物（`/raw/` 静态托管 + Samba 投放）；一套客户端配置全家复用，已缓存依赖在出口故障时仍可安装。见 [docs/package-mirror.md](docs/package-mirror.md) |
 | 内存调优 | — | zram 压缩交换（物理内存 50%）+ 内核内存策略（swappiness/vfs_cache_pressure）+ systemd-oomd 防冻结 |
 | 备份 | — | restic 加密快照 + rclone 网盘（3-2-1 异地加密副本，见下节） |
 
@@ -291,6 +292,15 @@ curl -sf http://127.0.0.1:8080/ | grep -o 'NAS 知识库中心'   # 主页（MkD
 git ls-remote http://127.0.0.1:3000/<gitea-user>/nas-docs.git refs/heads/pages  # 引擎 pages 信号分支存在
 tailscale serve status                    # 应显示 https://<机器名>.ts.net/ → http://127.0.0.1:8080（启用 Serve 前为 No serve config）
 
+# 包服务器（多语言统一入口 :8081）
+curl -sf http://127.0.0.1:8081/ | grep -o 'NAS 专用包服务器'          # 首页（客户端配置速查表）
+curl -sf http://127.0.0.1:8081/crates/config.json                    # 应含 /crates-dl/ 指向本机
+curl -sI http://127.0.0.1:8081/crates/se/rd/serde | grep -i x-cache-status  # 第二次应为 HIT
+systemctl is-active nginx devpi-server athens                        # 三者均 active
+ss -tlnp | grep -E ':(8081|3141|3700)\b'                             # 3141 绑 127.0.0.1；3700 绑 0.0.0.0 但不在放行端口内
+ls -ld /srv/pkg/raw                                                  # 产物目录（nas:users 0775）
+testparm -s 2>/dev/null | grep -A2 '\[pkg-raw\]'                     # 产物投放共享存在
+
 # zram / GC
 zramctl                                  # 应见 /dev/zram0 [SWAP]
 sysctl vm.swappiness vm.vfs_cache_pressure  # 应为 20 / 50
@@ -317,6 +327,7 @@ nix-env --list-generations --profile /nix/var/nix/profiles/system  # 存在多�
 | 22 | SSH（仅密钥） | LAN / tailnet |
 | 3000 | Gitea Web | LAN / tailnet |
 | 8080 | 知识库 Docs（Caddy，公开只读） | LAN / tailnet，另经 tailscale serve 提供尾网 HTTPS |
+| 8081 | 包服务器（nginx 统一入口，公开只读） | LAN / tailnet |
 | 9090 | Cockpit（HTTPS + root 口令） | LAN / tailnet |
 | 445/139 | Samba 文件共享 | LAN |
 | 22000 | Syncthing 同步 | LAN |

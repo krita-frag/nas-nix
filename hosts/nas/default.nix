@@ -19,6 +19,9 @@
     ../../modules/services/tailscale-serve.nix
     ../../modules/services/backup.nix
     ../../modules/services/rustdesk.nix
+    ../../modules/services/pkg-mirror.nix
+    # NPanel：NixOS 原生 Web 门面（flake input 来自本机 Gitea 镜像，见 flake.nix）
+    ../../modules/services/npanel.nix
     # agenix 密钥声明（加密文件在 secrets/*.age，规则文件 secrets/secrets.nix 仅供 CLI 使用）
     ../../modules/system/agenix.nix
   ];
@@ -93,7 +96,24 @@
   };
 
   # RustDesk 内网远程桌面：hbbs(ID) + hbbr(中继)，见 modules/services/rustdesk.nix
-  services.rustdesk.enable = true;
+  # lanInterfaces 限定端口放行的内网网卡（另有 tailscale0 始终放行）；
+  # 有线口未接线时同样列出，插网线即可用。
+  services.rustdesk = {
+    enable = true;
+    lanInterfaces = [ "enp1s0" "enp3s0" "wlo1" ];
+  };
+
+  # 局域网专用包服务器：统一入口 http://nas.local:8081（多语言一套配置）
+  #   /pypi/  Python（devpi 按需缓存 PyPI + 私有索引）
+  #   /go/    Go（athens，GOPROXY 按需缓存）
+  #   /crates/ /crates-dl/  Rust（cargo 稀疏索引缓存转发）
+  #   /npm/   npm（registry 缓存转发）
+  #   /raw/   Zig 依赖包、C++ 预编译产物、私有 wheel（Samba 共享 pkg-raw 投放）
+  # 其余可选项（Nix 二进制缓存 / 尾网 HTTPS）默认关闭，见模块内注释。
+  # 客户端配置与运维见 docs/package-mirror.md。
+  services.pkgMirror = {
+    enable = true;
+  };
 
   # 尾网 HTTPS 入口：Docs(:443 根)、Gitea(:8443)、Cockpit(:9443) 经 tailscale serve
   # 挂到尾网稳定主机名 https://nas-1.tailf2ba32.ts.net[;PORT]（有效证书、仅 tailnet 可达），
@@ -107,11 +127,12 @@
     ];
   };
 
-  # 集中备份：restic 加密快照。当前为 VM 测试阶段，repository 指向本地测试仓库
-  # 以验证备份/恢复流程；实机部署时替换为真实目标（S3 原生或 rclone:<remote>:<path>），
-  # 见 modules/services/backup.nix。
+  # 集中备份：restic 加密快照。本地测试仓库曾把本机盘写满（94G / 116G，2026-09-26），
+  # 已删除并停用：repository 留空即禁用备份服务（见 modules/services/backup.nix）。
+  # 启用前先把 repository 指到真实目标（S3 原生或 rclone:<remote>:<path>），
+  # 严禁再指向本机磁盘。
   services.backup = {
     enable = true;
-    repository = "/var/lib/restic-test";
+    repository = "";
   };
 }

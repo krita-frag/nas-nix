@@ -93,10 +93,46 @@
         "url": "https://mirrors.tuna.tsinghua.edu.cn/git/nixpkgs.git"
       }
     },
+    "nixpkgs_3": {
+      "locked": {
+        "lastModified": 1789006805,
+        "narHash": "sha256-xB8mKMOx1IA9vTDNLmJZ6n4wCMq/cuWBBOzGCRnqxrU=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "8ce4ef6cb6f871616146b9fe26d2a5ae594e94fe",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "npanel": {
+      "inputs": {
+        "nixpkgs": "nixpkgs_3"
+      },
+      "locked": {
+        "lastModified": 1790405529,
+        "narHash": "sha256-JbsSNnpwiROBeoXUCuO6vDeExpPic9N7jRhh+RZK7So=",
+        "ref": "main",
+        "rev": "45e516a778a81945ec6bb3652b98ec2b01a1f055",
+        "revCount": 28,
+        "type": "git",
+        "url": "http://nas.local:3000/zhou/npanel.git"
+      },
+      "original": {
+        "ref": "main",
+        "type": "git",
+        "url": "http://nas.local:3000/zhou/npanel.git"
+      }
+    },
     "root": {
       "inputs": {
         "agenix": "agenix",
-        "nixpkgs": "nixpkgs_2"
+        "nixpkgs": "nixpkgs_2",
+        "npanel": "npanel"
       }
     },
     "systems": {

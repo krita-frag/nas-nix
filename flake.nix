@@ -9,9 +9,11 @@
     # vendor 本地 path input：首装机（nixos-install）无法访问 GitHub，
     # 从仓库内源码直接读取，安装/部署全程零 GitHub 依赖
     agenix.url = "path:./vendor/agenix";
+    # NPanel：NixOS 原生 Web 门面（本机 Gitea 镜像仓库；主源确认后可切 GitHub）
+    npanel.url = "git+http://nas.local:3000/zhou/npanel.git?ref=main";
   };
 
-  outputs = { self, nixpkgs, agenix, ... }:
+  outputs = { self, nixpkgs, agenix, npanel, ... }:
     let
       # 部署工具：从 macOS（aarch64-darwin）驱动远程构建/切换
       nixos-rebuild = system: nixpkgs.legacyPackages.${system}.nixos-rebuild;
@@ -56,7 +58,7 @@
               (builtins.attrNames entries));
           mkSystem = modules: nixpkgs.lib.nixosSystem {
             system = "x86_64-linux";
-            modules = [ agenix.nixosModules.age ] ++ modules;
+            modules = [ agenix.nixosModules.age npanel.nixosModules.default ] ++ modules;
           };
           # 完整配置：import hosts/<name>/
           full = builtins.listToAttrs (map
