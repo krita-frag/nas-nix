@@ -7,6 +7,8 @@
 #   - 目标：repository 填入实际仓库后自动启用每日 03:00 备份（Persistent 补跑错过的任务），
 #     留空则不定义备份服务——占位仓库会导致定时任务反复失败，故未配置时整体禁用；
 #   - 保留策略：每日 7 份 + 每周 4 份 + 每月 12 份，prune 自动清理；
+#   - 本地占用：仓库在远端，本机只有 restic 缓存，落数据盘 /srv/restic-cache
+#     （系统盘不驻留缓存内容），并由 restic-cache-clean timer 每日清理 14 天前的缓存；
 #   - 恢复：手动 `restic -r <repository> snapshots/restore`（见 README「备份与恢复」）。
 {
   options.services.backup = {
@@ -70,11 +72,44 @@
       ];
     };
 
-    # rclone 桥接仓库：把配置路径注入备份服务环境（RCLONE_CONFIG），restic 调用
-    # rclone 时凭据可用。nixpkgs restic 模块无 environment 选项，故直接扩展
-    # 其生成的单元（restic-backups-nas-data）添加 Environment
-    systemd.services."restic-backups-nas-data" = lib.mkIf (config.services.backup.repository != "" && config.services.backup.rcloneConf != null) {
-      serviceConfig.Environment = "RCLONE_CONFIG=${config.services.backup.rcloneConf}";
+    # 缓存落点与定期清理：仅在启用（repository 非空）时定义，禁用期不产生任何备份单元。
+    #   - 缓存落点：nixpkgs 模块把备份服务的 RESTIC_CACHE_DIR 指向系统盘
+    #     /var/cache/restic-backups-<name>，这里用 mkForce 改指数据盘
+    #     /srv/restic-cache，让备份缓存不驻留系统盘；
+    #   - 定期清理：缓存规模随仓库增长，独立 timer 每日删除 14 天未写入的缓存文件。
+    #     不用 systemd-tmpfiles 的 age 字段——实测它只判定目录自身（空目录超龄才删），
+    #     不递归清理目录内容；
+    #   - 缓存可再生，删除不影响仓库完整性与历史快照；仓库体积本身由 pruneOpts 保留策略控制。
+    systemd = lib.mkIf (config.services.backup.repository != "") {
+      tmpfiles.rules = [
+        "d /srv/restic-cache 0700 root root -"
+      ];
+
+      # 扩展模块生成的单元：改缓存落点，并在 rclone 桥接时注入远端凭据（RCLONE_CONFIG）。
+      # 模块自身已定义同键 RESTIC_CACHE_DIR，需 mkForce 提升优先级才能覆盖
+      # （模块的 CacheDirectory 仍会建出空的 /var/cache/restic-backups-nas-data，不驻留内容）。
+      services."restic-backups-nas-data".environment = {
+        RESTIC_CACHE_DIR = lib.mkForce "/srv/restic-cache";
+      } // lib.optionalAttrs (config.services.backup.rcloneConf != null) {
+        RCLONE_CONFIG = config.services.backup.rcloneConf;
+      };
+
+      services.restic-cache-clean = {
+        description = "清理 restic 缓存（删除 14 天前的缓存文件）";
+        serviceConfig = {
+          Type = "oneshot";
+          ExecStart = "${pkgs.findutils}/bin/find /srv/restic-cache -mindepth 1 -mtime +14 -delete";
+        };
+      };
+
+      timers.restic-cache-clean = {
+        description = "每日清理 restic 缓存，避免占用增长";
+        wantedBy = [ "timers.target" ];
+        timerConfig = {
+          OnCalendar = "daily";
+          Persistent = true;
+        };
+      };
     };
   };
 }

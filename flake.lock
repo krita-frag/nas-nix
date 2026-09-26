@@ -114,11 +114,11 @@
         "nixpkgs": "nixpkgs_3"
       },
       "locked": {
-        "lastModified": 1790405529,
-        "narHash": "sha256-JbsSNnpwiROBeoXUCuO6vDeExpPic9N7jRhh+RZK7So=",
+        "lastModified": 1790430169,
+        "narHash": "sha256-DDFX9NEoMvHx8f7x94MnCju2moM4SS8EGik/jjco+P8=",
         "ref": "main",
-        "rev": "45e516a778a81945ec6bb3652b98ec2b01a1f055",
-        "revCount": 28,
+        "rev": "44d3ab32af552e10e4ec6b6304aed31c7043cae0",
+        "revCount": 41,
         "type": "git",
         "url": "http://nas.local:3000/zhou/npanel.git"
       },

@@ -67,7 +67,10 @@ fi
 case "${MODE}" in
   switch)
     echo "==> 远程构建并切换 ${FLAKE}（构建/切换均在 NAS 进行）"
+    # --no-reexec：关闭 nixos-rebuild-ng 的自我更新。该机制会先构建目标系统的
+    # nixos-rebuild（x86_64-linux）再 execve 到本机 macOS，跨架构必失败。
     nix run .#nixos-rebuild -- switch \
+      --no-reexec \
       --flake "${FLAKE}" \
       --build-host "${REMOTE}" \
       --target-host "${REMOTE}"
@@ -81,11 +84,13 @@ case "${MODE}" in
   dry-run)
     echo "==> 预演：构建但不切换"
     nix run .#nixos-rebuild -- dry-activate \
+      --no-reexec \
       --flake "${FLAKE}" --build-host "${REMOTE}" --target-host "${REMOTE}"
     ;;
   rollback)
     echo "==> 回滚到上一代"
     nix run .#nixos-rebuild -- switch \
+      --no-reexec \
       --flake "${FLAKE}" --build-host "${REMOTE}" --target-host "${REMOTE}" --rollback
     ;;
   smoke)

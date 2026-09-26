@@ -11,6 +11,12 @@
     # 直连访问（不经 Caddy）：8080 已被 Caddy 占用，9090 是 Cockpit，故用 8081。
     listenAddress = "0.0.0.0:8081";
     # 登录用系统用户名口令（D37，PAM），allowedGroup 缺省 wheel，无需再配口令。
+    # rebuild 目标指向本机检出（/etc/nixos#verify）——面板写入的 npanel-managed.nix
+    # 被该 flake imports，构成「面板改配置 → 预演重建」闭环；正式系统切换仍走 deploy.sh。
+    rebuildTarget = "/etc/nixos#verify";
+    # Web 终端（D42）：PTY 会话以登录用户身份运行，root agent 白名单因此扩展
+    # term-* 命令——授权边界的显式扩张，部署者确认后打开。
+    terminal = true;
   };
 
   # 异名 unit 必须用贡献点声明（同名才推得出来，宁漏勿错）：
